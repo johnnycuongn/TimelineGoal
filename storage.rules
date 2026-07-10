@@ -1,0 +1,33 @@
+rules_version = '2';
+
+// TimelineGoal Storage rules — SKELETON (M0).
+// Corner photos & covers live under couples/{coupleId}/... and are readable/writable
+// only by that couple's members. Membership is verified against Firestore.
+// Uploads are capped and must be images (client compresses before upload).
+
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isMember(coupleId) {
+      return signedIn()
+        && firestore.exists(/databases/(default)/documents/couples/$(coupleId))
+        && request.auth.uid in firestore.get(/databases/(default)/documents/couples/$(coupleId)).data.members;
+    }
+
+    match /couples/{coupleId}/{allPaths=**} {
+      allow read: if isMember(coupleId);
+      allow write: if isMember(coupleId)
+        && request.resource.size < 10 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
+    }
+
+    // Default deny.
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}
