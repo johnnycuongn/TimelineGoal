@@ -56,16 +56,18 @@ Two terminals from the project root:
 
 ## M2 — The daily ritual 🐾 (make-or-break)
 
-- [ ] Weekly goals CRUD (title, charm, owner, target units, ISO-week period)
-- [ ] Goal cards: own (rose) / partner (their color) / shared (gradient); press feedback per motion-spec
-- [ ] Paw-print check-ins: append-only `checkins` events, ink-splat stamp + tick haptic
-- [ ] Rive bulldog integrated: `idle` / `happy` / `sleepy` states + boop interactions
-- [ ] Home "Den": bulldog + Today strip (check in directly)
-- [ ] Real-time partner ticker (`onSnapshot`) + toast in partner color
-- [ ] Flick-a-heart reactions (physics arc; bulldog `love` state)
-- [ ] Offline check-ins verified (airplane mode → sync on reconnect)
+- [x] Weekly goals CRUD (title, charm, owner, target units, ISO-week period + tested period math) *(2026-07-10)*
+- [x] Goal cards: own/partner colors, shared = both-dot badge (true gradient when we add expo-linear-gradient); press feedback per motion-spec *(2026-07-10)*
+- [x] Paw-print check-ins: append-only `checkins` events, ink-splat stamp synced to data + tick haptic, success haptic on completion *(2026-07-10)*
+- [x] Bulldog `idle`/`happy`/`sleepy`/`love` + boop — **placeholder edition** (Reanimated glyph on the same mood store; Rive artboard swaps in at the dev build since Expo Go can't load it) *(2026-07-10)*
+- [x] Home "Den": bulldog + Today strip (check in directly) + evening sleepy *(2026-07-10)*
+- [x] Real-time partner ticker (`onSnapshot` on denormalized `activity` collection) *(2026-07-10)*
+- [x] Reactions: tap-a-heart on ticker items → partner's bulldog `love` + haptic — *flick-physics arc deferred to M3 polish* *(2026-07-10)*
+- [ ] Offline check-ins verified (airplane mode → sync on reconnect) — needs a live device run
+- [ ] **Rive bulldog artboard** (real art) — needs dev build; deferred
 
-**Exit test**: checking in feels so good you do it for fake goals. Both partners' check-ins appear live on the other phone.
+**Verification done**: typecheck ✓ · unit 16/16 ✓ · emulator 16/16 ✓ (goals/check-ins/reactions/stranger-lockout) · iOS bundle ✓. **Not yet run live on simulator/device.**
+**Exit test**: checking in feels so good you do it for fake goals. Both partners' check-ins appear live on the other phone. *(pending live run — same recipe as M1: `npm run emulators` + `npm start`)*
 
 ## M3 — The Timeline 📅
 
@@ -115,3 +117,4 @@ Two terminals from the project root:
 | 2026-07-10 | M0 Firebase: project `timelinegoal` + web app, SDK client w/ emulator wiring, security rules skeleton + 8 passing rules tests. All gates green. | **M0 complete (dev-local)**; next = M1 (auth + pairing). Deferred: enable cloud services in console; boot on real device |
 | 2026-07-10 | Fixed Expo Go manifest 500 (stale `expo logout`). Pinned Node 24.15 (`.nvmrc`). | Dev server healthy |
 | 2026-07-10 | **M1 complete**: email/password auth, providers + routing guards, create/join pairing (transactions), celebration + name-bulldog, hardened rules. CSPRNG invite codes (security-review fix). typecheck+unit(10)+emulator(13)+bundle green. | **M1 done (not yet run live)**; next = boot on simulator w/ emulators, then M2 (daily ritual). Google/Apple + cloud-services enablement pending a dev build |
+| 2026-07-10 | Fixed web crash (feature-detect RN auth persistence). **M2 complete**: period math, goals+check-ins data layer, GoalCard w/ paw stamps, new-goal modal, Timeline week view, Den (bulldog placeholder + Today strip + sleepy), ticker + heart reactions. typecheck+unit(16)+emulator(16)+bundle green. | **M2 done (code)**; pending live run + offline check. Next = live two-user test, then M3 (Timeline ladder + seal + pulse ring) or dev build for Rive |
