@@ -45,6 +45,49 @@ export interface Invite {
   expiresAt: number;
 }
 
+/** A goal at any horizon. Lives at couples/{coupleId}/goals/{goalId}. */
+export interface Goal {
+  title: string;
+  /** User-chosen emoji charm decorating the goal (allowed as decoration, never UI icons). */
+  charm: string;
+  horizon: 'week' | 'quarter' | 'year';
+  /** uidA | uidB for personal goals, or 'shared'. Always visible to both. */
+  owner: string;
+  /** Period the goal belongs to, e.g. 2026-W28 / 2026-Q3 / 2026. */
+  period: string;
+  /** How many paw prints fill the goal (1–10 for weekly). */
+  targetUnits: number;
+  /** Parent goal in the ladder (weekly → quarterly → yearly). */
+  parentGoalId?: string | null;
+  createdBy: string;
+  createdAt: Timestamp;
+}
+
+/** Append-only check-in event. Lives at .../goals/{goalId}/checkins/{id}. */
+export interface CheckIn {
+  uid: string;
+  at: Timestamp;
+  note?: string;
+}
+
+/**
+ * Denormalized activity feed for the partner ticker.
+ * Lives at couples/{coupleId}/activity/{id}; written alongside each check-in.
+ */
+export interface Activity {
+  type: 'checkin';
+  uid: string;
+  goalId: string;
+  goalTitle: string;
+  charm: string;
+  at: Timestamp;
+  /** Reactions keyed by reacting uid, e.g. { uidB: 'heart' }. */
+  reactions?: Record<string, string>;
+}
+
 export const COUPLES = 'couples';
 export const USERS = 'users';
 export const INVITES = 'invites';
+export const GOALS = 'goals';
+export const CHECKINS = 'checkins';
+export const ACTIVITY = 'activity';
