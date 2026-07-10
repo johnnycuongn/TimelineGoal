@@ -1,17 +1,24 @@
-import { Tabs } from 'expo-router';
+import { Redirect, Tabs } from 'expo-router';
 import { Dog, ListChecks, MessagesSquare, Heart } from 'lucide-react-native';
 import type { LucideIcon } from 'lucide-react-native';
 import type { ColorValue } from 'react-native';
 
+import { Loading } from '@/components/loading';
+import { routeForStatus, useSession } from '@/features/session';
 import { fontFamily, radius, spacing, useTheme } from '@/theme';
 
 /**
  * Bottom tab bar — the app's primary navigation (≤5 items, icon + label).
  * Classic expo-router Tabs (not NativeTabs) so we fully own the cute rose styling.
  * Screens: Den (home) · Timeline (goals) · Corners · Us.
+ * Guarded: only reachable once the couple is fully set up.
  */
 export default function TabsLayout() {
   const { colors } = useTheme();
+  const { status } = useSession();
+
+  if (status === 'loading') return <Loading />;
+  if (status !== 'ready') return <Redirect href={routeForStatus[status]} />;
 
   return (
     <Tabs

@@ -1,2 +1,4 @@
 /// <reference types="jest" />
-// Loads Jest's global test types (describe/it/expect) for type-checking test files.
+/// <reference types="node" />
+// Loads Jest globals (describe/it/expect) and Node globals (__dirname, fs, path)
+// for type-checking test files. (TS 6 beta doesn't auto-pick these up here.)

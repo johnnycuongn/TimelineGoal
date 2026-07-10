@@ -101,11 +101,21 @@ describe('couples/{coupleId}', () => {
 });
 
 describe('pairing', () => {
-  it('lets a second person join a 1-member couple (1 → 2)', async () => {
-    await seed((db) => setDoc(doc(db, 'couples', 'solo'), { members: [ALICE] }));
+  it('lets a second person join a 1-member couple WITH an outstanding invite (1 → 2)', async () => {
+    await seed((db) =>
+      setDoc(doc(db, 'couples', 'solo'), { members: [ALICE], pendingInviteCode: 'ABC123' }),
+    );
     const bob = testEnv.authenticatedContext(BOB).firestore();
     await assertSucceeds(
       setDoc(doc(bob, 'couples', 'solo'), { members: [ALICE, BOB] }, { merge: true }),
+    );
+  });
+
+  it('forbids joining a 1-member couple that has NO outstanding invite', async () => {
+    await seed((db) => setDoc(doc(db, 'couples', 'private'), { members: [ALICE] }));
+    const bob = testEnv.authenticatedContext(BOB).firestore();
+    await assertFails(
+      setDoc(doc(bob, 'couples', 'private'), { members: [ALICE, BOB] }, { merge: true }),
     );
   });
 
