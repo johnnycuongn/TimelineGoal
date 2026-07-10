@@ -2,9 +2,9 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Project Status
+## Project Status & Progress Tracking
 
-Greenfield — no code scaffolded yet. The project is in the brainstorming/design phase. Design specs live in `docs/superpowers/specs/` once written; check there before implementing anything.
+Greenfield — design phase complete, implementation not started. **Before any implementation work, read `docs/MILESTONES.md`** — it is the persistent progress tracker across sessions: work the next unchecked item, check off completed+verified items with the date, update the Current Status line, and append to its session log before finishing. The approved design lives in `docs/superpowers/specs/2026-07-10-timelinegoal-design.md`.
 
 ## What This Is
 

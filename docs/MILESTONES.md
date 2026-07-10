@@ -1,0 +1,95 @@
+# TimelineGoal — Milestone Tracker
+
+> **Purpose**: persistent progress state across sessions. Any session doing implementation work MUST read this first, work the next unchecked item, and check items off (with date) as they're completed and verified. Update the **Current Status** line whenever it changes.
+
+**Current Status**: 🎨 Design phase complete — implementation not started. Next up: M0.
+
+**Design spec**: `docs/superpowers/specs/2026-07-10-timelinegoal-design.md` · **Original vision**: `docs/prompt_v1.md`
+
+---
+
+## M0 — Foundations
+
+- [ ] Expo scaffold: `create-expo-app` with TypeScript, Expo Router
+- [ ] Tab shell: Home / Goals / Corners / Us routes with placeholder screens
+- [ ] Design tokens module: rose palette (semantic tokens), spacing scale, motion constants (spring config, timing tokens)
+- [ ] Fonts: Fredoka + Nunito via expo-font
+- [ ] Core deps installed & configured: Reanimated 3, Gesture Handler, Rive RN, Expo Haptics, React Query, Zustand
+- [ ] Firebase project created (Spark tier); Auth + Firestore + Storage enabled
+- [ ] Firebase emulator suite running locally; app connects to emulators in dev
+- [ ] Security rules skeleton: membership-based access under `couples/{coupleId}` + rules tests scaffold
+- [ ] `docs/motion-spec.md` standing doc (extract from design spec) — *(project skills already exist in `.claude/skills/`)*
+- [ ] Update CLAUDE.md Commands section with real commands (start, test, lint)
+
+**Exit test**: app boots on device with tab shell, tokens/fonts applied, emulator connection verified.
+
+## M1 — A couple exists 💑
+
+- [ ] Auth: Apple / Google / email sign-in
+- [ ] `users/{uid}` profile creation on first sign-in
+- [ ] Create couple flow → mints 6-char invite code (`invites/{code}`, short TTL)
+- [ ] Join flow: enter code → transaction adds member two, deletes code
+- [ ] Pairing celebration: heart-halves snap animation + bulldog "adopted"
+- [ ] Name-the-bulldog screen (writes `couples/{id}/bulldog.name`)
+- [ ] Partner color selection during onboarding
+- [ ] Security rules: full membership enforcement + emulator rules tests passing
+
+**Exit test**: two phones, one couple, both see the same den + bulldog name in real time.
+
+## M2 — The daily ritual 🐾 (make-or-break)
+
+- [ ] Weekly goals CRUD (title, charm, owner, target units, ISO-week period)
+- [ ] Goal cards: own (rose) / partner (their color) / shared (gradient); press feedback per motion-spec
+- [ ] Paw-print check-ins: append-only `checkins` events, ink-splat stamp + tick haptic
+- [ ] Rive bulldog integrated: `idle` / `happy` / `sleepy` states + boop interactions
+- [ ] Home "Den": bulldog + Today strip (check in directly)
+- [ ] Real-time partner ticker (`onSnapshot`) + toast in partner color
+- [ ] Flick-a-heart reactions (physics arc; bulldog `love` state)
+- [ ] Offline check-ins verified (airplane mode → sync on reconnect)
+
+**Exit test**: checking in feels so good you do it for fake goals. Both partners' check-ins appear live on the other phone.
+
+## M3 — The Timeline 📅
+
+- [ ] Quarterly + yearly goals; `parentGoalId` ladder linking (offered at creation)
+- [ ] Week / Quarter / Year segmented views
+- [ ] Ladder rollup math (client-side) + unit tests for period/rollup logic
+- [ ] Ladder nudge animation (paw floats up to parent bar)
+- [ ] Seal-the-deal: 10s both-tap window, wax-stamp slam, unsealed fallback + "seal pending" nudge
+- [ ] Weekly pulse ring around bulldog (both colors meeting in middle)
+- [ ] Bulldog states: `party` (+confetti particles), `proud`, `pout`
+- [ ] Streak doodles on den wall
+
+**Exit test**: a weekly check-in visibly nudges quarter + year; seal moment lands with both phones.
+
+## M4 — Corners 💬
+
+- [ ] Corner grid: create, cover photo, emoji charms
+- [ ] Chat per corner (real-time, reactions)
+- [ ] Pins: photo / note / link, scrapbook positioning
+- [ ] Polls + ⭐ decided stamps (polls and messages)
+- [ ] "Make it a goal →" decision→Timeline pipeline
+- [ ] Firebase Storage: uploads under `couples/{id}/`, client-side compression, rules
+
+**Exit test**: discuss → poll → decide ⭐ → converted goal appears on the Timeline.
+
+## M5 — Polish & ship ✨
+
+- [ ] Push notifications (Expo Notifications): partner check-in, seal pending, gentle weekly nudge — warm tone, all optional
+- [ ] Bulldog cosmetics: bandanas/den decorations unlocked at milestones, equip UI in Us tab
+- [ ] Empty states with character (bulldog holding signs)
+- [ ] Reduced-motion pass (springs→fades, confetti off)
+- [ ] Dark mode pass (desaturated rose, contrast re-checked)
+- [ ] Onboarding wizard polish + first-goal wizard
+- [ ] Us tab: anniversary, days-together counter, pairing management
+- [ ] EAS builds → TestFlight / Play internal track on both phones
+
+**Exit test**: both partners live in the app for a full week without hitting a rough edge.
+
+---
+
+## Session log
+
+| Date | Session did | State left at |
+|---|---|---|
+| 2026-07-10 | Brainstorm → approved design spec, project skills (motion-spec, cuteness, couple-growth), this tracker | Design complete; M0 not started |
