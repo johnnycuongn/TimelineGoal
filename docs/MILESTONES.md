@@ -2,7 +2,12 @@
 
 > **Purpose**: persistent progress state across sessions. Any session doing implementation work MUST read this first, work the next unchecked item, and check items off (with date) as they're completed and verified. Update the **Current Status** line whenever it changes.
 
-**Current Status**: 🚧 M0 in progress — app foundation built & verified (typecheck + iOS bundle + tests green). Remaining: Firebase project/emulators/rules (needs interactive `firebase login`). Stack is **Expo SDK 57** (not the SDK assumed in the design spec — see spec addendum).
+**Current Status**: ✅ **M0 complete** (dev-local). App foundation + Firebase emulator dev environment built & verified. One interactive sub-task deferred to M1 start: enabling the **cloud** Auth/Firestore/Storage services in the Firebase console (all M0 dev runs on emulators, so not a blocker). Next up: **M1 — A couple exists**. Stack is **Expo SDK 57**.
+
+**Environment gotchas for future sessions** (learned this session):
+- Firebase emulators need **Java 21** for the newer `firebase` (nvm node22 → v15) but only Java ≤16 is installed. Use the **homebrew `firebase` 12.4.4** (default node/PATH) + `JAVA_HOME=.../jdk-16...` for emulator work — that combo is verified working. Installing JDK 21 would let the newer CLI run.
+- Firebase cloud CLI ops (projects/apps) were run under **nvm node 22.12** (`export PATH="$HOME/.nvm/versions/node/v22.12.0/bin:$PATH"`); the app itself builds on node 20.11.
+- Node 20.11 is below SDK 57's preferred 20.19.4 (warnings only so far).
 
 **Design spec**: `docs/superpowers/specs/2026-07-10-timelinegoal-design.md` · **Original vision**: `docs/prompt_v1.md`
 
@@ -15,15 +20,16 @@
 - [x] Design tokens module: `src/theme/` — colors (light+dark), spacing/radius/elevation, typography, motion, haptics *(2026-07-10)*
 - [x] Fonts: Fredoka + Nunito via `@expo-google-fonts`, loaded in root layout *(2026-07-10)*
 - [x] Core deps installed: Reanimated 4 (+worklets), Gesture Handler, Rive RN, Expo Haptics, React Query, Zustand, Lucide, svg *(2026-07-10)*
-- [ ] Firebase project created (Spark tier); Auth + Firestore + Storage enabled — **needs `firebase login` (interactive)**
-- [ ] Firebase emulator suite running locally; app connects to emulators in dev
-- [ ] Security rules skeleton: membership-based access under `couples/{coupleId}` + rules tests scaffold
+- [x] Firebase project `timelinegoal` created (Spark) + web app registered + `.firebaserc` *(2026-07-10)*
+- [ ] **Enable cloud Auth + Firestore + Storage in console** — interactive, deferred to M1 start (dev uses emulators). URLs: `console.firebase.google.com/project/timelinegoal/{authentication,firestore,storage}`
+- [x] Firebase emulator suite configured (`firebase.json`); app connects in dev (`src/lib/firebase.ts`) *(2026-07-10)*
+- [x] Security rules skeleton: membership-gated `couples/{coupleId}` (`firestore.rules` + `storage.rules`) + rules-test scaffold, 8 passing *(2026-07-10)*
 - [x] `docs/motion-spec.md` standing doc (pointer to the enforced skill + code tokens) *(2026-07-10)*
 - [x] Update CLAUDE.md Commands section with real commands (start, test, lint, typecheck, export) *(2026-07-10)*
 - [x] Jest test runner (jest-expo) wired + first passing suite (`src/theme/colors.test.ts`) *(2026-07-10)*
 
-**Verification done**: `npm run typecheck` ✓ · `npm test` ✓ (4/4) · `npx expo export --platform ios` ✓ (bundles clean). Not yet run on a physical device/simulator.
-**Exit test**: app boots on device with tab shell, tokens/fonts applied, emulator connection verified.
+**Verification done**: `npm run typecheck` ✓ · `npm test` ✓ (4/4) · `npm run test:rules` ✓ (8/8 vs emulator) · `npx expo export --platform ios` ✓ (bundles clean). Not yet run on a physical device/simulator.
+**Exit test**: app boots on device with tab shell, tokens/fonts applied, emulator connection verified. *(bundle + emulator verified; live device boot pending — do at M1 start with `npm start`.)*
 
 ## M1 — A couple exists 💑
 
@@ -96,3 +102,4 @@
 |---|---|---|
 | 2026-07-10 | Brainstorm → approved design spec, project skills (motion-spec, cuteness, couple-growth), this tracker | Design complete; M0 not started |
 | 2026-07-10 | M0 build: SDK 57 scaffold, 4-tab shell, `src/theme/` design system, fonts, core deps, Jest + first test, motion-spec doc. Verified via typecheck/bundle/tests. | M0 ~70%; next = Firebase project + emulators + rules (interactive `firebase login`) |
+| 2026-07-10 | M0 Firebase: project `timelinegoal` + web app, SDK client w/ emulator wiring, security rules skeleton + 8 passing rules tests. All gates green. | **M0 complete (dev-local)**; next = M1 (auth + pairing). Deferred: enable cloud services in console; boot on real device |
