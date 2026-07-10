@@ -23,6 +23,16 @@ Greenfield — no code scaffolded yet. The project is in the brainstorming/desig
 - **Firebase** — auth, Firestore database, storage, real-time sync between the two partners
 - A **Motion/Gameplay UI spec** is planned for React Native interactions (animations, playful feedback) — treat motion as a first-class part of the product, not polish
 
+## Project Skills (mandatory)
+
+Three project skills in `.claude/skills/` encode the approved design — invoke the relevant one BEFORE the work, not after:
+
+- **`motion-spec`** — before any screen/component/animation/gesture/haptic work (spring physics laws, bulldog state machine, gameplay mechanics)
+- **`cuteness`** — before any visual/copy/icon/empty-state work (visual language, bulldog voice, copy rules)
+- **`couple-growth`** — before any goals/check-ins/rewards/notifications/partner-interaction design (never-compare-partners principles, mechanic design tests)
+
+The full approved design lives in `docs/superpowers/specs/2026-07-10-timelinegoal-design.md`; the original vision is preserved verbatim in `docs/prompt_v1.md`.
+
 ## Design System
 
 Always use the `ui-ux-pro-max` skill for any UI/UX work (screens, components, colors, typography, motion, review). Generated baseline for this product:
