@@ -63,7 +63,7 @@ export default function JoinCoupleScreen() {
             autoCapitalize="characters"
             autoCorrect={false}
             maxLength={INVITE_CODE_LENGTH}
-            placeholder="ABC123"
+            placeholder="ABCD2345"
           />
           <ColorPicker value={color} onChange={setColor} />
           {error ? (

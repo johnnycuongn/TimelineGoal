@@ -47,7 +47,7 @@ describe('createCouple', () => {
     const db = asUser(ALICE);
     const { coupleId, code } = await createCouple(db, { uid: ALICE, partnerColor: ROSE });
 
-    expect(code).toHaveLength(6);
+    expect(code).toHaveLength(8);
 
     const couple = await getDoc(doc(db, 'couples', coupleId));
     expect(couple.data()?.members).toEqual([ALICE]);

@@ -130,8 +130,8 @@ const styles = StyleSheet.create({
   },
   code: {
     fontFamily: fontFamily.headingBold,
-    fontSize: 40,
-    letterSpacing: 6,
+    fontSize: 30,
+    letterSpacing: 4,
   },
 });
 

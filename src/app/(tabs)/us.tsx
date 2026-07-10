@@ -73,6 +73,6 @@ const styles = StyleSheet.create({
     borderRadius: radius.lg,
     borderWidth: 1,
   },
-  code: { fontFamily: fontFamily.headingBold, fontSize: 40, letterSpacing: 6 },
+  code: { fontFamily: fontFamily.headingBold, fontSize: 30, letterSpacing: 4 },
   footer: { marginTop: 'auto', paddingBottom: spacing.lg },
 });

@@ -34,16 +34,25 @@
 
 ## M1 — A couple exists 💑
 
-- [ ] Auth: Apple / Google / email sign-in
-- [ ] `users/{uid}` profile creation on first sign-in
-- [ ] Create couple flow → mints 6-char invite code (`invites/{code}`, short TTL)
-- [ ] Join flow: enter code → transaction adds member two, deletes code
-- [ ] Pairing celebration: heart-halves snap animation + bulldog "adopted"
-- [ ] Name-the-bulldog screen (writes `couples/{id}/bulldog.name`)
-- [ ] Partner color selection during onboarding
-- [ ] Security rules: full membership enforcement + emulator rules tests passing
+- [x] Auth: **email/password** (`src/features/auth`) — Apple/Google deferred to the native dev build (M2+); architected for it *(2026-07-10)*
+- [x] `users/{uid}` profile creation on first sign-in (`ensureUserProfile`) *(2026-07-10)*
+- [x] Create couple → mints 6-char invite code + `pendingInviteCode` on the couple *(2026-07-10)*
+- [x] Join flow: enter code → transaction adds member two, consumes invite *(2026-07-10)*
+- [x] Pairing celebration: partner-colored halves snap + bulldog "adopted" (reduced-motion aware, celebration haptic) *(2026-07-10)*
+- [x] Name-the-bulldog screen (writes `bulldog.name`) *(2026-07-10)*
+- [x] Partner color selection during onboarding (`ColorPicker`, curated accents) *(2026-07-10)*
+- [x] Security rules hardened: join requires an outstanding invite; membership enforced; **13/13 emulator tests** *(2026-07-10)*
 
-**Exit test**: two phones, one couple, both see the same den + bulldog name in real time.
+**Verification done**: `npm run typecheck` ✓ · `npm test` ✓ (9) · `npm run test:emulator` ✓ (13) · `npx expo export --platform ios` ✓ (3553 modules incl. Firebase). Full emulator suite (auth+firestore+storage) boots under firebase 12.4.4 + Java 16. **Not yet driven on a simulator/device** (auth UI flow needs manual run with emulators up).
+**Exit test**: two phones, one couple, both see the same den + bulldog name in real time. *(pending live run)*
+
+### ▶ How to test M1 live (do this next)
+Two terminals from the project root:
+1. **Emulators** (default shell / node 20.11 so PATH `firebase` = homebrew 12.4.4; Java 16 is default): `npm run emulators` — starts auth+firestore+storage (+ UI at :4000).
+2. **App**: `nvm use` (→ 24.15) then `npm start`, press `i` (iOS Simulator — `localhost` reaches the emulators).
+   - **Physical device**: set `EXPO_PUBLIC_FIREBASE_EMULATOR_HOST=<your Mac LAN IP>` before `npm start` (device can't see `localhost`). Or, once cloud services are enabled, set `EXPO_PUBLIC_USE_FIREBASE_EMULATORS=false` to hit real Firebase.
+- Two-user test: sign up in the simulator (create world → note code), sign up a second account in Expo Go / a second sim, join with the code → both see the paired den. Emulator data resets on restart.
+- **Still deferred from M0**: enabling cloud Auth/Firestore/Storage in the console — only needed to test off-emulator or ship.
 
 ## M2 — The daily ritual 🐾 (make-or-break)
 
