@@ -17,11 +17,15 @@ Greenfield — design phase complete, implementation not started. **Before any i
 
 **Product values (non-negotiable)**: cuteness, fun, simplicity, interactivity. Every feature should be judged against "is this enjoyable for a couple to use together?"
 
+## ⚠️ Expo SDK 57 — read versioned docs first
+
+This project runs **Expo SDK 57** (React Native 0.86, React 19.2, Reanimated **4.5** + react-native-worklets, TypeScript 6, New Architecture). SDK 57 post-dates most training data — **before writing Expo/Reanimated/Router code, read the exact versioned docs at https://docs.expo.dev/versions/v57.0.0/** (this is also the standing order in `AGENTS.md`). Notably: Reanimated is **v4** (worklets live in `react-native-worklets`, not the reanimated package; requires New Arch), and app code lives under **`src/app/`** (Expo Router, typed routes + React Compiler enabled in `app.json`).
+
 ## Tech Stack
 
-- **React Native + Expo** (managed workflow) — mobile app
+- **Expo SDK 57 (managed) + React Native 0.86 + TypeScript 6** — app code under `src/app/` (Expo Router, file-based, typed routes on)
 - **Firebase** — auth, Firestore database, storage, real-time sync between the two partners
-- A **Motion/Gameplay UI spec** is planned for React Native interactions (animations, playful feedback) — treat motion as a first-class part of the product, not polish
+- **Motion**: Reanimated 4.5 + react-native-worklets + react-native-gesture-handler; Rive RN runtime for the bulldog; Expo Haptics. Treat motion as first-class product, not polish.
 
 ## Project Skills (mandatory)
 
@@ -44,4 +48,11 @@ Always use the `ui-ux-pro-max` skill for any UI/UX work (screens, components, co
 
 ## Commands
 
-No build/test tooling exists yet. Once Expo is scaffolded, this section should be updated with the actual commands (`npx expo start`, test runner, lint).
+- `npm start` — Expo dev server (`expo start`); `npm run ios` / `npm run android` / `npm run web` to target a platform
+- `npm run lint` — `expo lint`
+- `npm run typecheck` — `tsc --noEmit`
+- `npm test` — Jest (jest-expo preset); `npm run test:watch` for watch mode
+- Run a single test: `npx jest path/to/file.test.ts` or `npx jest -t "test name substring"`
+- Smoke-test the bundle without a simulator: `npx expo export --platform ios --output-dir /tmp/tg-export`
+
+**Node note**: SDK 57 tooling wants Node ≥20.19.4; this machine has 20.11.0. If `expo start` misbehaves, bump Node (e.g. `nvm install 20.19.4`) before debugging further.

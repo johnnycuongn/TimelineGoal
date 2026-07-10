@@ -49,7 +49,7 @@ Boops (poke = squish, drag = lean in) attach to NO mechanics. Pure joy.
 
 ## Tech Mapping
 
-Reanimated 3 + Gesture Handler (springs/gestures) · Rive RN runtime (bulldog) · Expo Haptics · confetti = lightweight Reanimated particles (no heavy lib).
+Reanimated 4 (+ react-native-worklets) + Gesture Handler (springs/gestures) · Rive RN runtime (bulldog) · Expo Haptics · confetti = lightweight Reanimated particles (no heavy lib). Build = Expo SDK 57. `withSpring`/`useSharedValue`/`useAnimatedStyle` API unchanged from v3.
 
 ## Red Flags
 

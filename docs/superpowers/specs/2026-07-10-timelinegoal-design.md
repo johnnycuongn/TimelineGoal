@@ -25,7 +25,8 @@ A mobile app for exactly two people — a couple — to track goals together acr
 
 - **Expo (managed) + TypeScript + Expo Router** (file-based navigation)
 - **Firebase**: Auth (Apple/Google/email), Firestore (real-time sync + offline persistence), Storage (photos)
-- **Motion**: Reanimated 3 + Gesture Handler, Rive React Native runtime, Expo Haptics, lightweight Reanimated-based confetti particles (no heavy lib)
+- **Motion**: Reanimated 4 (+ react-native-worklets, New Arch) + Gesture Handler, Rive React Native runtime, Expo Haptics, lightweight Reanimated-based confetti particles (no heavy lib)
+  - *Note: build uses Expo SDK 57 (RN 0.86, React 19.2, TS 6). Reanimated 4 keeps the `withSpring`/`useSharedValue`/`useAnimatedStyle` API used throughout this spec; worklets moved to their own package.*
 - **State**: React Query wrapping Firestore listeners + Zustand for UI/animation state
 - **Fonts**: Fredoka (headings) / Nunito (body) via expo-font
 - **Testing**: Jest + React Native Testing Library; Firestore security-rules tests via emulator
