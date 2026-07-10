@@ -13,6 +13,7 @@ import { getApps, initializeApp } from 'firebase/app';
 import * as firebaseAuth from 'firebase/auth';
 import {
   connectAuthEmulator,
+  getAuth,
   initializeAuth,
   type Auth,
   type Persistence,
@@ -35,12 +36,14 @@ const firebaseConfig = {
 } as const;
 
 /**
- * `getReactNativePersistence` is exported only from Firebase's React Native build, so the
- * default (web) typings don't see it. Metro resolves the RN build at runtime; we cast here.
+ * `getReactNativePersistence` exists ONLY in Firebase's React Native build (which Metro
+ * resolves on iOS/Android). On web — and in the router-server's Node render used for
+ * static web output — `firebase/auth` resolves to builds without it, so we must feature-
+ * detect and fall back to the platform default (getAuth) instead of crashing.
  */
 const getReactNativePersistence = (
   firebaseAuth as unknown as {
-    getReactNativePersistence: (storage: unknown) => Persistence;
+    getReactNativePersistence?: (storage: unknown) => Persistence;
   }
 ).getReactNativePersistence;
 
@@ -54,9 +57,12 @@ const USE_EMULATORS =
 
 const app = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
 
-export const auth: Auth = initializeAuth(app, {
-  persistence: getReactNativePersistence(AsyncStorage),
-});
+export const auth: Auth =
+  typeof getReactNativePersistence === 'function'
+    ? // Native (iOS/Android): persist sessions in AsyncStorage.
+      initializeAuth(app, { persistence: getReactNativePersistence(AsyncStorage) })
+    : // Web / Node render: platform default persistence.
+      getAuth(app);
 
 // Long polling avoids the streaming-transport issues Firestore hits on some RN networks.
 export const db: Firestore = initializeFirestore(app, {
