@@ -55,4 +55,4 @@ Always use the `ui-ux-pro-max` skill for any UI/UX work (screens, components, co
 - Run a single test: `npx jest path/to/file.test.ts` or `npx jest -t "test name substring"`
 - Smoke-test the bundle without a simulator: `npx expo export --platform ios --output-dir /tmp/tg-export`
 
-**Node note**: SDK 57 tooling wants Node ≥20.19.4; this machine has 20.11.0. If `expo start` misbehaves, bump Node (e.g. `nvm install 20.19.4`) before debugging further.
+**Node**: project is pinned to **24.15.0** via `.nvmrc` (LTS, latest, verified to bundle clean with SDK 57). Run `nvm use` in the project dir before Expo commands. SDK 57 requires `^20.19.4 || ^22.13.0 || ^24.3.0 || >= 25.0.0` — the machine's default 20.11.0 is *below* range and triggers EBADENGINE warnings, so always `nvm use` first. (Firebase emulator work is separate — see the MILESTONES env-gotchas note.)
