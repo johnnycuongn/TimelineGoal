@@ -1,0 +1,247 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Bulldog Concepts — TimelineGoal</title>
+<style>
+  :root {
+    --rose: #BE185D; --pink: #EC4899; --bg: #FDF2F8; --ink: #0F172A;
+    --card: #FFFFFF; --border: #F7E3EB; --muted: #6B5561; --dark: #241820;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  body {
+    font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg); color: var(--ink); padding: 28px 20px 60px;
+  }
+  h1 { font-size: 26px; margin-bottom: 4px; }
+  .sub { color: var(--muted); margin-bottom: 28px; font-size: 14px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(290px, 1fr)); gap: 20px; max-width: 1080px; }
+  .card {
+    background: var(--card); border: 1px solid var(--border); border-radius: 22px;
+    padding: 20px; box-shadow: 0 4px 12px rgba(139,30,82,.08);
+  }
+  .card h2 { font-size: 19px; margin-bottom: 2px; }
+  .tag { display:inline-block; font-size: 11px; font-weight: 700; letter-spacing:.4px;
+    color:#fff; background: var(--rose); border-radius: 999px; padding: 3px 10px; margin-bottom: 10px; }
+  .tag.alt { background:#7C3AED } .tag.alt2 { background:#0D9488 }
+  .stage { display:flex; gap:10px; }
+  .stage > div { flex:1; border-radius: 16px; padding: 8px; display:flex; align-items:center; justify-content:center; }
+  .light { background: #FDF2F8; border: 1px solid var(--border); }
+  .darkbg { background: var(--dark); }
+  .label { font-size: 10px; text-transform: uppercase; letter-spacing: .8px; color: var(--muted); text-align:center; margin-top:4px; }
+  .desc { font-size: 13.5px; line-height: 1.55; color: var(--ink); margin-top: 14px; }
+  .desc b { color: var(--rose); }
+  ul.moves { margin: 10px 0 0 18px; font-size: 12.5px; color: var(--muted); line-height: 1.7; }
+  .rig { max-width: 1080px; margin-top: 28px; background: var(--card); border:1px solid var(--border);
+    border-radius: 22px; padding: 20px; }
+  .rig h2 { font-size: 17px; margin-bottom: 10px; }
+  table { border-collapse: collapse; width: 100%; font-size: 13px; }
+  td, th { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--border); }
+  th { color: var(--muted); font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: .6px; }
+  .note { font-size: 12.5px; color: var(--muted); margin-top: 12px; line-height: 1.6; }
+</style>
+</head>
+<body>
+
+<h1>Meet the candidates 🐾</h1>
+<p class="sub">Three bulldog directions, drawn in the exact medium he'll be built in (layered SVG). Each shown on light + dark backgrounds. The bandana/collar always takes your partner colors.</p>
+
+<svg width="0" height="0" style="position:absolute">
+  <defs>
+    <linearGradient id="banA" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#BE185D"/><stop offset="1" stop-color="#0D9488"/>
+    </linearGradient>
+
+    <!-- ========== A · MOCHI THE MARSHMALLOW ========== -->
+    <symbol id="dogA" viewBox="0 0 200 200">
+      <!-- ears (behind head) -->
+      <ellipse cx="56" cy="44" rx="17" ry="24" fill="#B08776" transform="rotate(-24 56 44)"/>
+      <ellipse cx="58" cy="47" rx="9" ry="14" fill="#F4B8C9" transform="rotate(-24 58 47)"/>
+      <ellipse cx="144" cy="44" rx="17" ry="24" fill="#B08776" transform="rotate(24 144 44)"/>
+      <ellipse cx="142" cy="47" rx="9" ry="14" fill="#F4B8C9" transform="rotate(24 142 47)"/>
+      <!-- tail -->
+      <circle cx="143" cy="158" r="8" fill="#FFF3E9"/>
+      <path d="M139,158 a5.5,5.5 0 1,1 8,4" fill="none" stroke="#E8CDB9" stroke-width="2.5" stroke-linecap="round"/>
+      <!-- body + legs -->
+      <ellipse cx="100" cy="160" rx="40" ry="28" fill="#FFF3E9"/>
+      <rect x="76" y="170" width="13" height="17" rx="6.5" fill="#FFF3E9"/>
+      <rect x="111" y="170" width="13" height="17" rx="6.5" fill="#FFF3E9"/>
+      <ellipse cx="100" cy="152" rx="20" ry="12" fill="#FFFDFB"/>
+      <!-- head -->
+      <ellipse cx="100" cy="80" rx="58" ry="52" fill="#FFF3E9"/>
+      <!-- forehead wrinkles -->
+      <path d="M80,50 Q100,42 120,50" fill="none" stroke="#E8CDB9" stroke-width="3" stroke-linecap="round"/>
+      <path d="M86,40 Q100,34 114,40" fill="none" stroke="#E8CDB9" stroke-width="2.4" stroke-linecap="round" opacity=".7"/>
+      <!-- eyes: big + glossy, low on face -->
+      <circle cx="72" cy="80" r="10.5" fill="#2E2436"/>
+      <circle cx="75.5" cy="76.5" r="3.6" fill="#fff"/>
+      <circle cx="69.5" cy="83.5" r="1.8" fill="#fff" opacity=".85"/>
+      <circle cx="128" cy="80" r="10.5" fill="#2E2436"/>
+      <circle cx="131.5" cy="76.5" r="3.6" fill="#fff"/>
+      <circle cx="125.5" cy="83.5" r="1.8" fill="#fff" opacity=".85"/>
+      <!-- blush -->
+      <ellipse cx="54" cy="98" rx="8.5" ry="5" fill="#F9C6D0" opacity=".8"/>
+      <ellipse cx="146" cy="98" rx="8.5" ry="5" fill="#F9C6D0" opacity=".8"/>
+      <!-- muzzle + jowls -->
+      <ellipse cx="100" cy="102" rx="30" ry="22" fill="#FFFDFB"/>
+      <ellipse cx="81" cy="112" rx="15" ry="12" fill="#FBE9DC"/>
+      <ellipse cx="119" cy="112" rx="15" ry="12" fill="#FBE9DC"/>
+      <circle cx="76" cy="110" r="1.1" fill="#D9B8A6"/><circle cx="82" cy="114" r="1.1" fill="#D9B8A6"/><circle cx="88" cy="110" r="1.1" fill="#D9B8A6"/>
+      <circle cx="112" cy="110" r="1.1" fill="#D9B8A6"/><circle cx="118" cy="114" r="1.1" fill="#D9B8A6"/><circle cx="124" cy="110" r="1.1" fill="#D9B8A6"/>
+      <!-- nose + mouth + tongue -->
+      <rect x="92" y="87" width="16" height="11" rx="5.5" fill="#4A3B41"/>
+      <circle cx="96.5" cy="90.5" r="1.7" fill="#fff" opacity=".5"/>
+      <path d="M100,98 Q100,104 94,105.5 M100,98 Q100,104 106,105.5" fill="none" stroke="#6B4E4E" stroke-width="2.2" stroke-linecap="round"/>
+      <ellipse cx="100" cy="110" rx="5.5" ry="4.5" fill="#F2789F"/>
+      <!-- bandana -->
+      <path d="M70,127 L130,127 L100,151 Z" fill="url(#banA)"/>
+      <rect x="67" y="121" width="66" height="9" rx="4.5" fill="#BE185D"/>
+    </symbol>
+
+    <!-- ========== B · SIR WRINKLES ========== -->
+    <symbol id="dogB" viewBox="0 0 200 200">
+      <!-- ears -->
+      <ellipse cx="52" cy="48" rx="16" ry="21" fill="#B78B5E" transform="rotate(-28 52 48)"/>
+      <ellipse cx="148" cy="48" rx="16" ry="21" fill="#B78B5E" transform="rotate(28 148 48)"/>
+      <!-- tail -->
+      <circle cx="148" cy="156" r="8" fill="#EBC79B"/>
+      <!-- body: wide stance -->
+      <ellipse cx="100" cy="158" rx="46" ry="27" fill="#EBC79B"/>
+      <rect x="66" y="168" width="14" height="18" rx="7" fill="#EBC79B"/>
+      <rect x="120" y="168" width="14" height="18" rx="7" fill="#EBC79B"/>
+      <ellipse cx="100" cy="152" rx="22" ry="13" fill="#FFF6EA"/>
+      <!-- head: broad + flat -->
+      <ellipse cx="100" cy="82" rx="60" ry="50" fill="#EBC79B"/>
+      <!-- eye patch -->
+      <ellipse cx="130" cy="76" rx="17" ry="15" fill="#C89065"/>
+      <!-- heavy brow + wrinkles -->
+      <path d="M76,48 Q100,38 124,48" fill="none" stroke="#C89B6C" stroke-width="3.4" stroke-linecap="round"/>
+      <path d="M82,38 Q100,30 118,38" fill="none" stroke="#C89B6C" stroke-width="2.6" stroke-linecap="round" opacity=".7"/>
+      <path d="M60,62 Q70,58 80,62" fill="none" stroke="#C89B6C" stroke-width="3" stroke-linecap="round"/>
+      <path d="M120,62 Q130,58 140,62" fill="none" stroke="#C89B6C" stroke-width="3" stroke-linecap="round"/>
+      <!-- droopy flat-top eyes -->
+      <path d="M62,72 a9,9 0 1,0 18,0 l-18,0 Z" fill="#2E2436" transform="translate(0,4)"/>
+      <circle cx="74" cy="80" r="2.6" fill="#fff"/>
+      <path d="M120,72 a9,9 0 1,0 18,0 l-18,0 Z" fill="#2E2436" transform="translate(0,4)"/>
+      <circle cx="132" cy="80" r="2.6" fill="#fff"/>
+      <!-- muzzle blaze + jowls -->
+      <path d="M100,58 Q112,58 112,74 L112,96 Q112,118 100,118 Q88,118 88,96 L88,74 Q88,58 100,58 Z" fill="#FFF6EA"/>
+      <ellipse cx="77" cy="115" rx="17" ry="14" fill="#DDAF7E"/>
+      <ellipse cx="123" cy="115" rx="17" ry="14" fill="#DDAF7E"/>
+      <!-- nose -->
+      <rect x="91" y="84" width="18" height="12" rx="6" fill="#3E3238"/>
+      <circle cx="96" cy="88" r="1.8" fill="#fff" opacity=".45"/>
+      <!-- underbite mouth + teeth -->
+      <path d="M76,110 Q100,120 124,110" fill="none" stroke="#8A6248" stroke-width="2.6" stroke-linecap="round"/>
+      <rect x="88" y="106" width="7" height="7" rx="2.5" fill="#fff"/>
+      <rect x="105" y="106" width="7" height="7" rx="2.5" fill="#fff"/>
+      <!-- collar + tag -->
+      <rect x="64" y="124" width="72" height="10" rx="5" fill="#D64545"/>
+      <circle cx="100" cy="140" r="6" fill="#F2C14E"/>
+      <circle cx="100" cy="140" r="2.4" fill="#D9A32E"/>
+    </symbol>
+
+    <!-- ========== C · BEAN ========== -->
+    <symbol id="dogC" viewBox="0 0 200 200">
+      <!-- ear nubs -->
+      <ellipse cx="64" cy="60" rx="11" ry="14" fill="#F2D8CB" transform="rotate(-16 64 60)"/>
+      <ellipse cx="136" cy="60" rx="11" ry="14" fill="#F2D8CB" transform="rotate(16 136 60)"/>
+      <!-- tail nub -->
+      <circle cx="152" cy="142" r="7" fill="#F2D8CB"/>
+      <!-- the bean -->
+      <ellipse cx="100" cy="118" rx="54" ry="60" fill="#FBEDE4"/>
+      <!-- feet nubs -->
+      <ellipse cx="74" cy="176" rx="10" ry="6.5" fill="#F2D8CB"/>
+      <ellipse cx="126" cy="176" rx="10" ry="6.5" fill="#F2D8CB"/>
+      <!-- face -->
+      <circle cx="78" cy="92" r="5.5" fill="#3A2F33"/>
+      <circle cx="80" cy="90" r="1.6" fill="#fff"/>
+      <circle cx="122" cy="92" r="5.5" fill="#3A2F33"/>
+      <circle cx="124" cy="90" r="1.6" fill="#fff"/>
+      <ellipse cx="100" cy="99" rx="4.5" ry="3.4" fill="#4A3B41"/>
+      <path d="M92,105 Q96,110 100,105 Q104,110 108,105" fill="none" stroke="#6B4E4E" stroke-width="2" stroke-linecap="round"/>
+      <!-- one soft wrinkle so he's still a bulldog -->
+      <path d="M84,72 Q100,66 116,72" fill="none" stroke="#EBD2C2" stroke-width="2.6" stroke-linecap="round"/>
+      <!-- blush -->
+      <ellipse cx="64" cy="104" rx="7.5" ry="4.5" fill="#F9C6D0" opacity=".85"/>
+      <ellipse cx="136" cy="104" rx="7.5" ry="4.5" fill="#F9C6D0" opacity=".85"/>
+      <!-- heart on the hip -->
+      <path d="M134,148 c-2,-3.4 -7,-2 -7,1.6 c0,2.6 3.4,4.8 7,7.4 c3.6,-2.6 7,-4.8 7,-7.4 c0,-3.6 -5,-5 -7,-1.6 Z" fill="#EC4899"/>
+      <!-- tiny neckerchief -->
+      <path d="M82,128 L118,128 L100,142 Z" fill="url(#banA)"/>
+    </symbol>
+  </defs>
+</svg>
+
+<div class="grid">
+  <div class="card">
+    <h2>A · Mochi the Marshmallow</h2>
+    <span class="tag">Recommended</span>
+    <div class="stage">
+      <div class="light"><svg width="150" height="150"><use href="#dogA"/></svg></div>
+      <div class="darkbg"><svg width="150" height="150"><use href="#dogA"/></svg></div>
+    </div>
+    <p class="label">light&nbsp;&nbsp;·&nbsp;&nbsp;dark</p>
+    <p class="desc">Cream chibi blob with <b>huge glossy eyes</b>, squishy jowls, forehead wrinkles, blush, tongue-peek, and the <b>partner-color bandana</b>. Maximum baby-schema cuteness — the face is 70% of him, built to emote.</p>
+    <ul class="moves">
+      <li><b>happy:</b> jowls jiggle + ears flap on the hop</li>
+      <li><b>boop:</b> whole-face squish, eyes squeeze to arcs</li>
+      <li><b>sleepy:</b> eyes → sleepy lids, body slow-breathes</li>
+      <li><b>eyes track your finger</b> (pupil offset)</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h2>B · Sir Wrinkles</h2>
+    <span class="tag alt">Most "bulldog"</span>
+    <div class="stage">
+      <div class="light"><svg width="150" height="150"><use href="#dogB"/></svg></div>
+      <div class="darkbg"><svg width="150" height="150"><use href="#dogB"/></svg></div>
+    </div>
+    <p class="label">light&nbsp;&nbsp;·&nbsp;&nbsp;dark</p>
+    <p class="desc">Fawn coat, <b>eye patch</b>, heavy brow, droopy eyes, wide stance and the signature <b>underbite with two little teeth</b>. Grumpy-cute: he looks unimpressed until you check in — then the teeth grin gets you.</p>
+    <ul class="moves">
+      <li><b>happy:</b> stoic → sudden full-body wiggle (contrast = comedy)</li>
+      <li><b>pout:</b> the champion pouter — brow drops, jowls sag</li>
+      <li><b>proud:</b> chest out, tag sparkles</li>
+      <li>collar tag doubles as milestone medal</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h2>C · Bean</h2>
+    <span class="tag alt2">Minimal kawaii</span>
+    <div class="stage">
+      <div class="light"><svg width="150" height="150"><use href="#dogC"/></svg></div>
+      <div class="darkbg"><svg width="150" height="150"><use href="#dogC"/></svg></div>
+    </div>
+    <p class="label">light&nbsp;&nbsp;·&nbsp;&nbsp;dark</p>
+    <p class="desc">The whole dog is <b>one soft bean</b> — dot eyes, w-mouth, nub ears, a heart on his hip. San-X/Molang energy. Least effort to animate beautifully; cuteness comes from timing, not detail.</p>
+    <ul class="moves">
+      <li><b>happy:</b> boings like jelly (squash & stretch)</li>
+      <li><b>boop:</b> ripples like poked pudding</li>
+      <li><b>love:</b> hip-heart floats up and pops</li>
+      <li>rolls instead of walks</li>
+    </ul>
+  </div>
+</div>
+
+<div class="rig">
+  <h2>Shared rig — how any of them comes alive</h2>
+  <table>
+    <tr><th>Mood</th><th>Choreography (Reanimated springs on SVG layer groups)</th></tr>
+    <tr><td>idle</td><td>breathing scale loop · blink every 3–6s · ear micro-flicks · pupils drift</td></tr>
+    <tr><td>happy</td><td>wiggle ±8° + hop, jowls/ears follow with lag (soft-body feel)</td></tr>
+    <tr><td>party <i>(M3)</i></td><td>zoomies: lean → dash bounce side to side + confetti layer</td></tr>
+    <tr><td>proud <i>(M3)</i></td><td>sit tall, chest up, sparkle eyes, medal pop</td></tr>
+    <tr><td>sleepy</td><td>lids down, slower breath, 💤 drift · boop to snort awake</td></tr>
+    <tr><td>pout <i>(M3)</i></td><td>brows in, jowls sag 4px, ears droop — no text guilt, ever</td></tr>
+    <tr><td>love</td><td>lean toward heart, catch it, roll over</td></tr>
+    <tr><td>boop</td><td>squish 0.88 + eyes squeeze + haptic tick — pure joy, no mechanics</td></tr>
+  </table>
+  <p class="note">All three use the same layered rig (ears / eyes / brows / jowls / mouth / body / tail as separate groups), the same mood store already in the app, Reduce-Motion falls back to static poses, and the bandana/collar/neckerchief is drawn from <b>both partner colors</b>. Mixing is allowed — e.g. Mochi's body with Sir Wrinkles' underbite teeth.</p>
+</div>
+
+</body>
+</html>
