@@ -65,7 +65,8 @@ Two terminals from the project root:
 - [x] Real-time partner ticker (`onSnapshot` on denormalized `activity` collection) *(2026-07-10)*
 - [x] Reactions: tap-a-heart on ticker items → partner's bulldog `love` + haptic — *flick-physics arc deferred to M3 polish* *(2026-07-10)*
 - [ ] Offline check-ins verified (airplane mode → sync on reconnect) — needs a live device run
-- [ ] **Rive bulldog artboard** (real art) — needs dev build; deferred
+- [x] **Real bulldog art: “Mochi the Marshmallow”** — layered-SVG character (approved concept A of 3, see `docs/design/bulldog-concepts.html` + `docs/superpowers/specs/2026-07-11-mochi-bulldog-design.md`): breathing, blinks, ear flicks, pupil drift, happy wiggle w/ jowl lag, sleepy lids+zzz, love heart, boop squish, partner-color bandana. Appears in Den, name-bulldog, celebration. *(2026-07-11)*
+- [ ] Rive artboard upgrade — optional M5 polish behind the same BulldogView interface (SVG Mochi may be enough)
 
 **Verification done**: typecheck ✓ · unit 16/16 ✓ · emulator 16/16 ✓ (goals/check-ins/reactions/stranger-lockout) · iOS bundle ✓. **Not yet run live on simulator/device.**
 **Exit test**: checking in feels so good you do it for fake goals. Both partners' check-ins appear live on the other phone. *(pending live run — same recipe as M1: `npm run emulators` + `npm start`)*
