@@ -8,9 +8,11 @@
     "scheme": "timelinegoal",
     "userInterfaceStyle": "automatic",
     "ios": {
+      "bundleIdentifier": "com.timelinegoal.app",
       "icon": "./assets/expo.icon"
     },
     "android": {
+      "package": "com.timelinegoal.app",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
