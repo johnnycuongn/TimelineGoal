@@ -9,6 +9,7 @@
  */
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Platform } from 'react-native';
 import { getApps, initializeApp } from 'firebase/app';
 import * as firebaseAuth from 'firebase/auth';
 import {
@@ -47,9 +48,16 @@ const getReactNativePersistence = (
   }
 ).getReactNativePersistence;
 
-/** Host the emulators are reachable at. localhost works for iOS sim + web; */
-/** set EXPO_PUBLIC_FIREBASE_EMULATOR_HOST to your Mac's LAN IP for a physical device. */
-const EMULATOR_HOST = process.env.EXPO_PUBLIC_FIREBASE_EMULATOR_HOST ?? 'localhost';
+/**
+ * Host the emulators are reachable at.
+ *  - iOS simulator / web: localhost IS the Mac.
+ *  - Android emulator: localhost is the phone; 10.0.2.2 is the host Mac.
+ *  - Physical device: set EXPO_PUBLIC_FIREBASE_EMULATOR_HOST to the Mac's LAN IP.
+ */
+const EMULATOR_HOST =
+  process.env.EXPO_PUBLIC_FIREBASE_EMULATOR_HOST ??
+  Platform.select({ android: '10.0.2.2', default: 'localhost' }) ??
+  'localhost';
 
 /** In dev, use emulators unless explicitly disabled. */
 const USE_EMULATORS =
