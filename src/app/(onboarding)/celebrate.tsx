@@ -1,5 +1,4 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { Dog } from 'lucide-react-native';
 import { useEffect } from 'react';
 import { Share, StyleSheet, View } from 'react-native';
 import Animated, {
@@ -14,6 +13,7 @@ import Animated, {
 import { Button } from '@/components/button';
 import { Screen } from '@/components/screen';
 import { Text } from '@/components/text';
+import { BulldogView } from '@/features/bulldog/BulldogView';
 import { useCouple } from '@/features/couple/CoupleProvider';
 import { fontFamily, haptics, radius, reducedMotionFadeMs, spacing, spring, useTheme } from '@/theme';
 
@@ -67,7 +67,7 @@ export default function CelebrateScreen() {
         <Animated.View style={[styles.dot, { backgroundColor: colorA }, leftStyle]} />
         <Animated.View style={[styles.dot, { backgroundColor: colorB, marginLeft: -24 }, rightStyle]} />
         <Animated.View style={[styles.bulldog, dogStyle]}>
-          <Dog color={colors.primary} size={80} strokeWidth={2} />
+          <BulldogView size={110} />
         </Animated.View>
       </View>
 

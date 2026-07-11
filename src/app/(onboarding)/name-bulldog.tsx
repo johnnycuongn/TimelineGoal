@@ -1,4 +1,3 @@
-import { Dog } from 'lucide-react-native';
 import { useState } from 'react';
 import { KeyboardAvoidingView, Platform, StyleSheet, View } from 'react-native';
 
@@ -6,13 +5,13 @@ import { Button } from '@/components/button';
 import { Screen } from '@/components/screen';
 import { Text } from '@/components/text';
 import { TextField } from '@/components/text-field';
+import { BulldogView } from '@/features/bulldog/BulldogView';
 import { useCouple } from '@/features/couple/CoupleProvider';
 import { setBulldogName } from '@/features/couple/api';
 import { db } from '@/lib/firebase';
-import { haptics, spacing, useTheme } from '@/theme';
+import { haptics, spacing } from '@/theme';
 
 export default function NameBulldogScreen() {
-  const { colors } = useTheme();
   const { coupleId, couple } = useCouple();
   const [name, setName] = useState(couple?.bulldog.name ?? '');
   const [busy, setBusy] = useState(false);
@@ -43,7 +42,7 @@ export default function NameBulldogScreen() {
         style={styles.flex}>
         <View style={styles.body}>
           <View style={styles.hero}>
-            <Dog color={colors.primary} size={96} strokeWidth={2} />
+            <BulldogView size={132} />
             <Text variant="title">Meet your bulldog</Text>
             <Text variant="body" color="textSecondary" style={styles.center}>
               This little one cheers you both on. What’s their name?
