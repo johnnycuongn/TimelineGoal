@@ -2,6 +2,11 @@
   "name": "timelinegoal",
   "main": "expo-router/entry",
   "version": "1.0.0",
+  "overrides": {
+    "stats-gl": {
+      "three": "$three"
+    }
+  },
   "dependencies": {
     "@expo-google-fonts/fredoka": "^0.4.1",
     "@expo-google-fonts/nunito": "^0.4.2",
