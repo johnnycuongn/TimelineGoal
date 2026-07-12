@@ -19,18 +19,19 @@ import Svg, {
   Stop,
 } from 'react-native-svg';
 
+// Coat warmed to "latte brown" per user feedback 2026-07-12 (was marshmallow cream #FFF3E9).
 export const MOCHI = {
-  cream: '#FFF3E9',
-  light: '#FFFDFB',
-  jowl: '#FBE9DC',
-  wrinkle: '#E8CDB9',
-  ear: '#B08776',
+  cream: '#F5E2C8',
+  light: '#FCF3E2',
+  jowl: '#EDD5B5',
+  wrinkle: '#D3B08A',
+  ear: '#9E7259',
   earInner: '#F4B8C9',
   eye: '#2E2436',
   nose: '#4A3B41',
-  blush: '#F9C6D0',
+  blush: '#F5B8C4',
   tongue: '#F2789F',
-  whisker: '#D9B8A6',
+  whisker: '#C29E7E',
 } as const;
 
 const VB = '0 0 200 200';

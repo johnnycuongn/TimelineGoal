@@ -17,10 +17,10 @@ swap behind the same `BulldogView` interface. Concept chosen: **A · Mochi the M
 - **Face**: huge glossy near-black eyes (`#2E2436`) set low/wide with double white highlights;
   lighter muzzle; two squishy jowls with 3 whisker dots each; rounded nose; w-mouth + tongue-peek;
   rose blush; two forehead wrinkle strokes; cocoa folded ears (`#B08776`) with pink inners
-- **Palette** (character-owned constants, deliberate exception to the semantic-token rule —
-  Mochi's cream `#FFF3E9` pops on both light and dark backgrounds, verified in the mockup):
-  cream `#FFF3E9` · light `#FFFDFB` · jowl `#FBE9DC` · wrinkle `#E8CDB9` · ear `#B08776` ·
-  ear-inner `#F4B8C9` · eye `#2E2436` · nose `#4A3B41` · blush `#F9C6D0` · tongue `#F2789F`
+- **Palette** (character-owned constants, deliberate exception to the semantic-token rule;
+  **coat warmed to latte brown 2026-07-12 at user request** — original marshmallow cream was `#FFF3E9`):
+  coat `#F5E2C8` · light `#FCF3E2` · jowl `#EDD5B5` · wrinkle `#D3B08A` · ear `#9E7259` ·
+  ear-inner `#F4B8C9` · eye `#2E2436` · nose `#4A3B41` · blush `#F5B8C4` · tongue `#F2789F`
 - **Bandana**: band + knotted triangle, filled with a **gradient of both partner colors**
   (from `couple.partnerColors`; falls back to rose/pink pre-pairing)
 
