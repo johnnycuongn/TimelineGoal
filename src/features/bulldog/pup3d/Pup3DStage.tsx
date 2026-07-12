@@ -18,8 +18,9 @@
 
 import { Canvas, useFrame } from '@react-three/fiber/native';
 import { useAnimations, useGLTF } from '@react-three/drei/native';
+import * as Device from 'expo-device';
 import { Suspense, useEffect, useRef } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Platform, Pressable, StyleSheet, View } from 'react-native';
 import { useReducedMotion } from 'react-native-reanimated';
 import { Box3, Color, LoopOnce, LoopRepeat, Mesh, MeshStandardMaterial, Vector3 } from 'three';
 import type { AnimationClip, Group, Object3D } from 'three';
@@ -51,6 +52,7 @@ function PupModel() {
   const { actions, mixer } = useAnimations(gltf.animations, group);
   const mood = useBulldogStore((s) => s.mood);
   const nonce = useBulldogStore((s) => s.nonce);
+  const setIdle = useBulldogStore((s) => s.setIdle);
 
   // Latte the coat (matched by material NAME; eyes/black stay factory).
   useEffect(() => {
@@ -77,9 +79,9 @@ function PupModel() {
     const center = box.getCenter(new Vector3());
     const maxDim = Math.max(size.x, size.y, size.z);
     if (!isFinite(maxDim) || maxDim <= 0) return;
-    const s = 2.3 / maxDim; // fill the stage
+    const s = 2.0 / maxDim; // fill the stage, with headroom for the big hop
     g.scale.setScalar(s);
-    g.position.set(-center.x * s, -box.min.y * s - 1.0, -center.z * s);
+    g.position.set(-center.x * s, -box.min.y * s - 1.05, -center.z * s);
     // Angle him slightly toward the camera for depth.
     g.rotation.y = -0.35;
   }, [gltf.scene]);
@@ -108,13 +110,20 @@ function PupModel() {
     move.clampWhenFinished = true;
     base.crossFadeTo(move.play(), 0.15, false);
 
-    const onFinished = () => {
+    // Deterministic return-to-idle: mixer 'finished' events proved unreliable here
+    // (and firing state updates from inside the render loop trips React warnings).
+    // A timer keyed to the clip's real duration is simple, and re-taps interrupt
+    // cleanly because this effect re-runs on nonce (clearing the pending timer).
+    const clipMs = Math.max(300, move.getClip().duration * 1000 - 120);
+    const timer = setTimeout(() => {
       base.reset().setLoop(LoopRepeat, Infinity);
       move.crossFadeTo(base.play(), 0.2, false);
-    };
-    mixer.addEventListener('finished', onFinished);
-    return () => mixer.removeEventListener('finished', onFinished);
-  }, [mood, nonce, actions, mixer, baseClip, reduceMotion]);
+      // Reset the shared mood so the NEXT tap/check-in retriggers (the SVG
+      // BulldogView isn't mounted to do this while 3D is showing).
+      setIdle();
+    }, clipMs);
+    return () => clearTimeout(timer);
+  }, [mood, nonce, actions, mixer, baseClip, reduceMotion, setIdle]);
 
   return (
     <group ref={group}>
@@ -149,11 +158,27 @@ function LoadingCube() {
 export default function Pup3DStage({ height = 240 }: { height?: number }) {
   const trigger = useBulldogStore((s) => s.trigger);
 
+  // The iOS SIMULATOR's GL initializes but never presents a frame (verified
+  // 2026-07-12: even a bare colored canvas stays invisible). Real iPhones and
+  // Android are fine — say so instead of showing a silent void.
+  if (Platform.OS === 'ios' && !Device.isDevice) {
+    return (
+      <View style={[styles.wrap, styles.simNote, { height }]}>
+        <Text variant="bodyLarge" style={styles.center}>
+          🫥 → 🐶
+        </Text>
+        <Text variant="caption" color="textSecondary" style={styles.center}>
+          The iOS simulator can’t draw 3D.{'\n'}Try the Android emulator or your iPhone!
+        </Text>
+      </View>
+    );
+  }
+
   return (
     <View style={[styles.wrap, { height }]}>
       <Canvas
         style={styles.flex}
-        camera={{ position: [0, 0.9, 3.4], fov: 42 }}
+        camera={{ position: [0, 1.0, 3.8], fov: 42 }}
         gl={{ antialias: true }}>
         {/* eslint-disable-next-line react/no-unknown-property */}
         <ambientLight intensity={1.15} />
@@ -184,4 +209,6 @@ const styles = StyleSheet.create({
   wrap: { alignSelf: 'stretch' },
   flex: { flex: 1 },
   hint: { textAlign: 'center', paddingTop: spacing.xs },
+  simNote: { alignItems: 'center', justifyContent: 'center', gap: spacing.sm },
+  center: { textAlign: 'center' },
 });
