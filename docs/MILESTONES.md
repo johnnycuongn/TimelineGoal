@@ -70,6 +70,8 @@ Two terminals from the project root:
 - [ ] Offline check-ins verified (airplane mode → sync on reconnect) — needs a live device run
 - [x] **Real bulldog art: “Mochi the Marshmallow”** — layered-SVG character (approved concept A of 3, see `docs/design/bulldog-concepts.html` + `docs/superpowers/specs/2026-07-11-mochi-bulldog-design.md`): breathing, blinks, ear flicks, pupil drift, happy wiggle w/ jowl lag, sleepy lids+zzz, love heart, boop squish, partner-color bandana. Appears in Den, name-bulldog, celebration. *(2026-07-11)*
 - [ ] Rive artboard upgrade — optional M5 polish behind the same BulldogView interface (SVG Mochi may be enough)
+- [x] Mochi coat warmed to latte brown (user request; preview `docs/design/mochi-latte.html`) *(2026-07-12)*
+- [x] **3D prototype**: CC0 Quaternius pug (Idle+Jump clips) via three/R3F/expo-gl behind the Den "✨ 3D pup (beta)" toggle; latte tint; research summary `docs/design/3d-research-summary.md`. **Decision gate pending live feel-test** — try on Android emulator or physical device; iOS *simulator* GL is unreliable *(2026-07-12)*
 
 **Verification done**: typecheck ✓ · unit 16/16 ✓ · emulator 16/16 ✓ (goals/check-ins/reactions/stranger-lockout) · iOS bundle ✓. **Not yet run live on simulator/device.**
 **Exit test**: checking in feels so good you do it for fake goals. Both partners' check-ins appear live on the other phone. *(pending live run — same recipe as M1: `npm run emulators` + `npm start`)*
