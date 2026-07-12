@@ -15,7 +15,7 @@ import { Ticker } from '@/features/goals/Ticker';
 import { haptics, radius, spacing, useTheme } from '@/theme';
 
 // Experimental 3D pup — lazy so three.js only evaluates when toggled on.
-const Pug3DStage = lazy(() => import('@/features/bulldog/pug3d/Pug3DStage'));
+const Pup3DStage = lazy(() => import('@/features/bulldog/pup3d/Pup3DStage'));
 
 /** The Den — bulldog + today strip + partner ticker. The daily landing. */
 export default function DenScreen() {
@@ -53,7 +53,7 @@ export default function DenScreen() {
         <View style={styles.hero}>
           {show3d ? (
             <Suspense fallback={<Loading message="Fetching the 3D pup…" />}>
-              <Pug3DStage height={200} />
+              <Pup3DStage height={240} />
             </Suspense>
           ) : (
             <BulldogView size={120} />
