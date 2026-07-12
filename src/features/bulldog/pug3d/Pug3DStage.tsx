@@ -16,12 +16,12 @@
  *  - The SVG Mochi remains the product mascot unless this experiment wins.
  */
 
-import { Canvas } from '@react-three/fiber/native';
+import { Canvas, useFrame } from '@react-three/fiber/native';
 import { useAnimations, useGLTF } from '@react-three/drei/native';
 import { Suspense, useEffect, useRef } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { useReducedMotion } from 'react-native-reanimated';
-import { Color, LoopOnce, LoopRepeat, Mesh, MeshStandardMaterial } from 'three';
+import { Box3, Color, LoopOnce, LoopRepeat, Mesh, MeshStandardMaterial, Vector3 } from 'three';
 import type { AnimationClip, Group, Object3D } from 'three';
 
 import { Text } from '@/components/text';
@@ -47,18 +47,37 @@ function PugModel() {
   const mood = useBulldogStore((s) => s.mood);
   const nonce = useBulldogStore((s) => s.nonce);
 
-  // Tint the coat browner + enable nicer shading on the low-poly mesh.
+  // Tint the coat browner (matched by material NAME, not instanceof, so a duplicated
+  // three copy can never break it).
   useEffect(() => {
     gltf.scene.traverse((obj: Object3D) => {
-      if (obj instanceof Mesh) {
-        const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
+      if (obj instanceof Mesh || (obj as Mesh).isMesh) {
+        const m = obj as Mesh;
+        const mats = Array.isArray(m.material) ? m.material : [m.material];
         for (const mat of mats) {
-          if (mat instanceof MeshStandardMaterial && mat.name === 'Beige') {
-            mat.color.copy(COAT_TINT);
+          if (mat && mat.name === 'Beige') {
+            (mat as MeshStandardMaterial).color?.copy(COAT_TINT);
           }
         }
       }
     });
+  }, [gltf.scene]);
+
+  // AUTO-FRAME: this FBX-converted model carries huge node scales (mesh ×100,
+  // armature ×39.5), so never trust hardcoded sizes — measure the real bounding
+  // box and normalize to a known stage size, feet on the floor, centered.
+  useEffect(() => {
+    const g = group.current;
+    if (!g) return;
+    g.updateWorldMatrix(true, true);
+    const box = new Box3().setFromObject(gltf.scene);
+    const size = box.getSize(new Vector3());
+    const center = box.getCenter(new Vector3());
+    const maxDim = Math.max(size.x, size.y, size.z);
+    if (!isFinite(maxDim) || maxDim <= 0) return;
+    const s = 1.9 / maxDim; // normalize longest side to ~1.9 world units
+    g.scale.setScalar(s);
+    g.position.set(-center.x * s, -box.min.y * s - 0.95, -center.z * s);
   }, [gltf.scene]);
 
   // Idle loop (or frozen pose under Reduce Motion).
@@ -94,10 +113,32 @@ function PugModel() {
   }, [mood, nonce, actions, mixer, reduceMotion]);
 
   return (
-    <group ref={group} position={[0, -1.05, 0]} scale={1.15}>
+    <group ref={group}>
       {/* eslint-disable-next-line react/no-unknown-property */}
       <primitive object={gltf.scene} />
     </group>
+  );
+}
+
+/**
+ * Visible Suspense fallback: a slowly tumbling latte cube. If you see this and it
+ * never becomes the pug, the GLB failed to load (loading — not framing — problem).
+ */
+function LoadingCube() {
+  const ref = useRef<Mesh>(null);
+  useFrame((_, delta) => {
+    if (ref.current) {
+      ref.current.rotation.x += delta * 0.9;
+      ref.current.rotation.y += delta * 1.3;
+    }
+  });
+  return (
+    <mesh ref={ref}>
+      {/* eslint-disable-next-line react/no-unknown-property */}
+      <boxGeometry args={[0.7, 0.7, 0.7]} />
+      {/* eslint-disable-next-line react/no-unknown-property */}
+      <meshStandardMaterial color="#D9B48A" />
+    </mesh>
   );
 }
 
@@ -122,7 +163,7 @@ export default function Pug3DStage({ height = 220 }: { height?: number }) {
           <ambientLight intensity={1.1} />
           {/* eslint-disable-next-line react/no-unknown-property */}
           <directionalLight position={[2, 4, 3]} intensity={1.6} />
-          <Suspense fallback={null}>
+          <Suspense fallback={<LoadingCube />}>
             <PugModel />
           </Suspense>
         </Canvas>
