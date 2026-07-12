@@ -1,8 +1,9 @@
 import { useRouter } from 'expo-router';
-import { useEffect } from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { lazy, Suspense, useEffect, useState } from 'react';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import { Button } from '@/components/button';
+import { Loading } from '@/components/loading';
 import { Screen } from '@/components/screen';
 import { Text } from '@/components/text';
 import { BulldogView } from '@/features/bulldog/BulldogView';
@@ -11,15 +12,20 @@ import { useCouple } from '@/features/couple/CoupleProvider';
 import { GoalCard } from '@/features/goals/GoalCard';
 import { useWeeklyGoals } from '@/features/goals/hooks';
 import { Ticker } from '@/features/goals/Ticker';
-import { spacing } from '@/theme';
+import { haptics, radius, spacing, useTheme } from '@/theme';
+
+// Experimental 3D pup — lazy so three.js only evaluates when toggled on.
+const Pug3DStage = lazy(() => import('@/features/bulldog/pug3d/Pug3DStage'));
 
 /** The Den — bulldog + today strip + partner ticker. The daily landing. */
 export default function DenScreen() {
   const router = useRouter();
+  const { colors } = useTheme();
   const { coupleId, couple } = useCouple();
   const { goals } = useWeeklyGoals(coupleId);
   const trigger = useBulldogStore((s) => s.trigger);
   const mood = useBulldogStore((s) => s.mood);
+  const [show3d, setShow3d] = useState(false);
 
   const bulldogName = couple?.bulldog.name || 'Your bulldog';
   const paired = (couple?.members.length ?? 1) >= 2;
@@ -45,11 +51,35 @@ export default function DenScreen() {
     <Screen>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
         <View style={styles.hero}>
-          <BulldogView size={120} />
+          {show3d ? (
+            <Suspense fallback={<Loading message="Fetching the 3D pup…" />}>
+              <Pug3DStage height={200} />
+            </Suspense>
+          ) : (
+            <BulldogView size={120} />
+          )}
           <Text variant="title">{bulldogName}’s Den</Text>
           <Text variant="caption" color="textSecondary">
             {paired ? 'boop the pup · tap a goal to check in' : 'waiting for your partner 🐾'}
           </Text>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityState={{ selected: show3d }}
+            onPress={() => {
+              haptics.tick();
+              setShow3d((v) => !v);
+            }}
+            style={[
+              styles.betaChip,
+              {
+                backgroundColor: show3d ? colors.primary : colors.muted,
+                borderColor: show3d ? colors.primary : colors.border,
+              },
+            ]}>
+            <Text variant="caption" color={show3d ? 'onPrimary' : 'textSecondary'}>
+              {show3d ? '↩ back to Mochi' : '✨ try the 3D pup (beta)'}
+            </Text>
+          </Pressable>
         </View>
 
         {strip.length > 0 ? (
@@ -86,6 +116,13 @@ export default function DenScreen() {
 const styles = StyleSheet.create({
   scroll: { gap: spacing.xl, paddingBottom: spacing.xxl },
   hero: { alignItems: 'center', gap: spacing.xs, paddingTop: spacing.md },
+  betaChip: {
+    marginTop: spacing.xs,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+  },
   section: { gap: spacing.sm },
   cards: { gap: spacing.md },
   center: { textAlign: 'center' },
