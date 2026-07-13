@@ -80,16 +80,17 @@ Two terminals from the project root:
 
 ## M3 — The Timeline 📅
 
-- [ ] Quarterly + yearly goals; `parentGoalId` ladder linking (offered at creation)
-- [ ] Week / Quarter / Year segmented views
-- [ ] Ladder rollup math (client-side) + unit tests for period/rollup logic
-- [ ] Ladder nudge animation (paw floats up to parent bar)
-- [ ] Seal-the-deal: 10s both-tap window, wax-stamp slam, unsealed fallback + "seal pending" nudge
-- [ ] Weekly pulse ring around bulldog (both colors meeting in middle)
-- [ ] Bulldog states: `party` (+confetti particles), `proud`, `pout`
-- [ ] Streak doodles on den wall
+- [x] Quarterly + yearly goals; `parentGoalId` ladder linking ("climbs toward…" chips at creation) *(2026-07-13)*
+- [x] Week / Quarter / Year segmented views (LadderCard for quarter/year: rollup bar + child paw rows) *(2026-07-13)*
+- [x] Ladder rollup math (client-side, `ladder.ts` pure fns) + unit tests — children feed parents fractionally; progress now denormalized as `progressBy.{uid}` counters on the goal doc (incremented in the check-in batch; `checkins/` stays the append-only keepsake) *(2026-07-13)*
+- [x] Ladder nudge animation — paw pops off the bar tip + bar bump, synced to DATA so partner check-ins nudge too; week cards float a paw up when linked *(2026-07-13)*
+- [x] Seal-the-deal: `seals.{uid}` wax stamps, 10s wax-warm window on creation (`/seal/[goalId]?armed=1`), live slam + both-color edge glow on either phone, unsealed fallback + Den "waiting for your paw" nudge (current periods only — old ones archive quietly) *(2026-07-13)*
+- [x] Weekly pulse ring around bulldog (partners fill from opposite ends via `weeklyPulse`, meet when the week closes) *(2026-07-13)*
+- [x] Bulldog states: `party` (double hop + Reanimated confetti particles), `proud` (sits tall + sparkles), `pout` (droopy jowls after 3 quiet days, boop to cheer); 3D pup maps party→Gallop_Jump, proud→Idle_HitReact_Left, pout→head-low *(2026-07-13)*
+- [x] Streak doodles on den wall (golden-angle scatter; kind rule: ≥1 filled goal lights a week; current week never breaks the streak) *(2026-07-13)*
 
-**Exit test**: a weekly check-in visibly nudges quarter + year; seal moment lands with both phones.
+**Verification done (2026-07-13)**: typecheck ✓ · unit 36/36 ✓ · emulator 17/17 ✓ (progressBy counters, seal flow, stranger lockout) · `expo lint` 0 errors (first-ever lint run — expo bootstrapped eslint.config.js; `react-hooks/immutability` off for Reanimated shared-value writes, set-state-in-effect downgraded to warn for the Firestore reset-then-subscribe idiom) · iOS export ✓.
+**Exit test**: a weekly check-in visibly nudges quarter + year; seal moment lands with both phones. *(pending live two-phone run)*
 
 ## M4 — Corners 💬
 
