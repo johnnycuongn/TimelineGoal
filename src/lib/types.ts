@@ -59,6 +59,14 @@ export interface Goal {
   targetUnits: number;
   /** Parent goal in the ladder (weekly → quarterly → yearly). */
   parentGoalId?: string | null;
+  /**
+   * Denormalized check-in counts by uid, incremented in the same batch as each
+   * check-in (like `activity` — the append-only checkins/ stays the history).
+   * Powers ladder rollups and the pulse ring without per-goal listeners.
+   */
+  progressBy?: Record<string, number>;
+  /** Shared goals only: uid → when they pressed the wax. Sealed once both are in. */
+  seals?: Record<string, Timestamp>;
   createdBy: string;
   createdAt: Timestamp;
 }

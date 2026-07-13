@@ -49,3 +49,58 @@ export function currentPeriod(horizon: Horizon, date: Date = new Date()): string
       return yearPeriod(date);
   }
 }
+
+/** One rung up the ladder: week → quarter, quarter → year, year → null. */
+export function parentHorizon(horizon: Horizon): Horizon | null {
+  return horizon === 'week' ? 'quarter' : horizon === 'quarter' ? 'year' : null;
+}
+
+/** One rung down the ladder: year → quarter, quarter → week, week → null. */
+export function childHorizon(horizon: Horizon): Horizon | null {
+  return horizon === 'year' ? 'quarter' : horizon === 'quarter' ? 'week' : null;
+}
+
+/** Monday of the given ISO week, at local midday (DST-safe for day arithmetic). */
+export function dateOfIsoWeek(isoYear: number, week: number): Date {
+  // Jan 4 is always in ISO week 1; back up to that week's Monday.
+  const jan4 = new Date(isoYear, 0, 4, 12);
+  const jan4Day = (jan4.getDay() + 6) % 7; // Mon=0..Sun=6
+  const d = new Date(isoYear, 0, 4 - jan4Day, 12);
+  d.setDate(d.getDate() + (week - 1) * 7);
+  return d;
+}
+
+/**
+ * The period one rung up the ladder: "2026-W28" → "2026-Q3", "2026-Q3" → "2026".
+ * A week straddling a quarter boundary belongs to its Thursday's quarter (same
+ * convention ISO uses for week-years). Returns null for a year period.
+ */
+export function parentPeriod(period: string): string | null {
+  const w = /^(\d{4})-W(\d{2})$/.exec(period);
+  if (w) {
+    const thursday = dateOfIsoWeek(Number(w[1]), Number(w[2]));
+    thursday.setDate(thursday.getDate() + 3);
+    return quarterPeriod(thursday);
+  }
+  const q = /^(\d{4})-Q([1-4])$/.exec(period);
+  if (q) return q[1];
+  return null;
+}
+
+/** The ISO week before `period` — handles year boundaries ("2026-W01" → "2025-W53"). */
+export function prevWeekPeriod(period: string): string {
+  const m = /^(\d{4})-W(\d{2})$/.exec(period);
+  if (!m) throw new Error(`Not a week period: ${period}`);
+  const monday = dateOfIsoWeek(Number(m[1]), Number(m[2]));
+  monday.setDate(monday.getDate() - 7);
+  return weekPeriod(monday);
+}
+
+/** Friendly label: "Week 28" · "Q3 2026" · "2026". */
+export function periodLabel(period: string): string {
+  const w = /^(\d{4})-W(\d{2})$/.exec(period);
+  if (w) return `Week ${Number(w[2])}`;
+  const q = /^(\d{4})-Q([1-4])$/.exec(period);
+  if (q) return `Q${q[2]} ${q[1]}`;
+  return period;
+}

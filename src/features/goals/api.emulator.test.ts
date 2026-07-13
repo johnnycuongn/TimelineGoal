@@ -12,7 +12,7 @@ import { readFileSync } from 'fs';
 import { resolve } from 'path';
 import { collection, doc, getDoc, getDocs, setDoc, type Firestore } from 'firebase/firestore';
 
-import { checkIn, createGoal, reactToActivity } from './api';
+import { checkIn, createGoal, reactToActivity, sealGoal } from './api';
 import { weekPeriod } from './period';
 
 const PROJECT_ID = 'demo-timelinegoal';
@@ -83,9 +83,39 @@ describe('createGoal + checkIn', () => {
     );
     expect(checkins.size).toBe(2);
 
+    // Denormalized per-partner counters incremented in the same batch.
+    const after = await getDoc(doc(db, 'couples', COUPLE_ID, 'goals', goalId));
+    expect(after.data()?.progressBy).toEqual({ [ALICE]: 1, [BOB]: 1 });
+
     // Ticker activity written alongside.
     const activity = await getDocs(collection(db, 'couples', COUPLE_ID, 'activity'));
     expect(activity.size).toBe(2);
+  });
+
+  it('seals a shared goal once both partners press the wax', async () => {
+    const db = asUser(ALICE);
+    const goalId = await createGoal(db, {
+      coupleId: COUPLE_ID,
+      uid: ALICE,
+      title: 'Save for Kyoto',
+      charm: '✈️',
+      horizon: 'quarter',
+      owner: 'shared',
+      targetUnits: 4,
+    });
+
+    await sealGoal(db, { coupleId: COUPLE_ID, goalId, uid: ALICE });
+    let saved = await getDoc(doc(db, 'couples', COUPLE_ID, 'goals', goalId));
+    expect(Object.keys(saved.data()?.seals ?? {})).toEqual([ALICE]);
+
+    await sealGoal(asUser(BOB), { coupleId: COUPLE_ID, goalId, uid: BOB });
+    saved = await getDoc(doc(db, 'couples', COUPLE_ID, 'goals', goalId));
+    expect(Object.keys(saved.data()?.seals ?? {}).sort()).toEqual([ALICE, BOB].sort());
+
+    // A stranger's paw never reaches the wax.
+    await expect(
+      sealGoal(asUser(STRANGER), { coupleId: COUPLE_ID, goalId, uid: STRANGER }),
+    ).rejects.toBeTruthy();
   });
 
   it('lets a partner react to an activity item', async () => {

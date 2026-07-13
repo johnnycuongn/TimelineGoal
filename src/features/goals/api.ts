@@ -11,6 +11,7 @@ import {
   deleteDoc,
   doc,
   type Firestore,
+  increment,
   serverTimestamp,
   updateDoc,
   writeBatch,
@@ -87,6 +88,11 @@ export async function checkIn(
     at: serverTimestamp(),
     ...(note ? { note } : {}),
   });
+  // Denormalized per-partner counter (increment = conflict-free, offline-safe);
+  // ladder rollups and the pulse ring read this instead of listening per goal.
+  batch.update(doc(db, COUPLES, coupleId, GOALS, goalId), {
+    [`progressBy.${uid}`]: increment(1),
+  });
   const activityRef = doc(collection(db, COUPLES, coupleId, ACTIVITY));
   batch.set(activityRef, {
     type: 'checkin',
@@ -97,6 +103,20 @@ export async function checkIn(
     at: serverTimestamp(),
   });
   await batch.commit();
+}
+
+/**
+ * Press your paw into the wax on a shared goal. Each partner writes only their
+ * own key; the goal counts as sealed once both are present (see ladder.isSealed).
+ */
+export async function sealGoal(
+  db: Firestore,
+  params: { coupleId: string; goalId: string; uid: string },
+): Promise<void> {
+  const { coupleId, goalId, uid } = params;
+  await updateDoc(doc(db, COUPLES, coupleId, GOALS, goalId), {
+    [`seals.${uid}`]: serverTimestamp(),
+  });
 }
 
 /** React to a partner's activity item (heart / highfive / proud). */
