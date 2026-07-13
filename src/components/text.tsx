@@ -1,7 +1,6 @@
 import { Text as RNText, type TextProps as RNTextProps } from 'react-native';
 
-import { textRole, useTheme, type TextRole } from '@/theme';
-import type { Palette } from '@/theme';
+import { textRole, useTheme, type Palette, type TextRole } from '@/theme';
 
 type ColorToken = keyof Pick<
   Palette,

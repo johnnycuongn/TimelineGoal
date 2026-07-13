@@ -16,7 +16,9 @@ import { useActivity } from '@/features/goals/hooks';
 import { db } from '@/lib/firebase';
 import { haptics, radius, spacing, useTheme } from '@/theme';
 
-function timeAgo(ms: number): string {
+function timeAgo(ms: number | null): string {
+  // A null timestamp = our own write still echoing locally (pending serverTimestamp).
+  if (ms === null) return 'just now';
   const mins = Math.max(0, Math.round((Date.now() - ms) / 60000));
   if (mins < 1) return 'just now';
   if (mins < 60) return `${mins}m ago`;
@@ -77,7 +79,7 @@ export function Ticker({
         const who = isMine ? 'You' : (partnerName ?? 'Your partner');
         const accent = partnerColors[item.uid] ?? colors.primary;
         const myReaction = user ? item.reactions?.[user.uid] : undefined;
-        const at = (item.at as { toMillis?: () => number })?.toMillis?.() ?? Date.now();
+        const at = (item.at as { toMillis?: () => number })?.toMillis?.() ?? null;
         return (
           <View
             key={item.id}

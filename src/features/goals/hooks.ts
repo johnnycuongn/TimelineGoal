@@ -4,27 +4,40 @@
 
 import {
   collection,
+  doc,
   limit,
   onSnapshot,
   orderBy,
   query,
-  where,
 } from 'firebase/firestore';
 import { useEffect, useMemo, useState } from 'react';
 
 import { db } from '@/lib/firebase';
 import { ACTIVITY, CHECKINS, COUPLES, GOALS, type Activity, type CheckIn, type Goal } from '@/lib/types';
-import { weekPeriod } from './period';
 
 export interface GoalWithId extends Goal {
   id: string;
 }
 
-/** Live list of this week's goals for the couple. */
-export function useWeeklyGoals(coupleId: string | null): { goals: GoalWithId[]; loading: boolean } {
+/** Stable, friendly order: shared first, then by creation time. */
+export function sortFriendly(goals: GoalWithId[]): GoalWithId[] {
+  return [...goals].sort((a, b) => {
+    if ((a.owner === 'shared') !== (b.owner === 'shared')) {
+      return a.owner === 'shared' ? -1 : 1;
+    }
+    return (a.createdAt?.toMillis?.() ?? 0) - (b.createdAt?.toMillis?.() ?? 0);
+  });
+}
+
+/**
+ * Live: EVERY goal in the couple's world. One listener powers the week view,
+ * ladder rollups, streak doodles, the pulse ring and seal nudges — a couple's
+ * goal list stays small, and progress lives on the goal docs (progressBy).
+ * Slice it with the pure selectors in ./ladder.
+ */
+export function useAllGoals(coupleId: string | null): { goals: GoalWithId[]; loading: boolean } {
   const [goals, setGoals] = useState<GoalWithId[]>([]);
   const [loading, setLoading] = useState(true);
-  const period = weekPeriod();
 
   useEffect(() => {
     if (!coupleId) {
@@ -33,26 +46,37 @@ export function useWeeklyGoals(coupleId: string | null): { goals: GoalWithId[]; 
       return;
     }
     setLoading(true);
-    const q = query(
-      collection(db, COUPLES, coupleId, GOALS),
-      where('horizon', '==', 'week'),
-      where('period', '==', period),
-    );
-    return onSnapshot(q, (snap) => {
-      const next = snap.docs.map((d) => ({ id: d.id, ...(d.data() as Goal) }));
-      // Stable, friendly order: shared first, then by creation time.
-      next.sort((a, b) => {
-        if ((a.owner === 'shared') !== (b.owner === 'shared')) {
-          return a.owner === 'shared' ? -1 : 1;
-        }
-        return (a.createdAt?.toMillis?.() ?? 0) - (b.createdAt?.toMillis?.() ?? 0);
-      });
-      setGoals(next);
+    return onSnapshot(collection(db, COUPLES, coupleId, GOALS), (snap) => {
+      setGoals(sortFriendly(snap.docs.map((d) => ({ id: d.id, ...(d.data() as Goal) }))));
       setLoading(false);
     });
-  }, [coupleId, period]);
+  }, [coupleId]);
 
   return { goals, loading };
+}
+
+/** Live single goal (the seal screen watches the wax in real time). */
+export function useGoal(
+  coupleId: string | null,
+  goalId: string | null,
+): { goal: GoalWithId | null; loading: boolean } {
+  const [goal, setGoal] = useState<GoalWithId | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!coupleId || !goalId) {
+      setGoal(null);
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    return onSnapshot(doc(db, COUPLES, coupleId, GOALS, goalId), (snap) => {
+      setGoal(snap.exists() ? ({ id: snap.id, ...(snap.data() as Goal) } as GoalWithId) : null);
+      setLoading(false);
+    });
+  }, [coupleId, goalId]);
+
+  return { goal, loading };
 }
 
 /** Live check-ins for one goal (progress = checkins.length, per-partner splits derivable). */

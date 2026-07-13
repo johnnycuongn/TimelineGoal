@@ -21,6 +21,7 @@ export const INVITE_TTL_MS = 24 * 60 * 60 * 1000;
  */
 function secureRandomBytes(n: number): Uint8Array {
   try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports -- intentional lazy load with Node fallback
     const Crypto = require('expo-crypto') as { getRandomBytes: (len: number) => Uint8Array };
     return Crypto.getRandomBytes(n);
   } catch {

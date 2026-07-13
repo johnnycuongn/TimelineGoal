@@ -12,7 +12,7 @@ export default function CornersScreen() {
       <MessagesSquare color={colors.primary} size={72} strokeWidth={2} />
       <Text variant="display">Corners</Text>
       <Text variant="body" color="textSecondary" style={{ textAlign: 'center' }}>
-        A little corner for every plan we're{'\n'}dreaming up together.
+        A little corner for every plan we’re{'\n'}dreaming up together.
       </Text>
     </Screen>
   );

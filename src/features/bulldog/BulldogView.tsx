@@ -7,15 +7,18 @@
  *
  * idle: breathing + randomized blinks + occasional ear flick
  * happy: whole-pup wiggle + hop, jowls/ears lag a beat behind, ^^ arc eyes + open mouth
+ * party: double hop + big wiggles + confetti burst (goal complete / seal slam)
+ * proud: sits tall and holds it, sparkles by the ears (quarter/year milestone)
  * sleepy: heavy lids, slower breath, drifting zzz — boop to snort awake
+ * pout: droopy jowls + ears after 3+ quiet days — boop to cheer up (never text-guilt)
  * love: lean + arc eyes + heart pop
  * boop: squish + eye squeeze (pure joy, no mechanics)
  *
- * Reduce Motion → static pose per mood (no loops, no blinks).
+ * Reduce Motion → static pose per mood (no loops, no blinks, confetti off).
  * A Rive artboard can replace these internals later; the interface stays { size }.
  */
 
-import { Heart } from 'lucide-react-native';
+import { Heart, Sparkles } from 'lucide-react-native';
 import { useEffect } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import Animated, {
@@ -33,6 +36,7 @@ import Animated, {
 
 import { useCouple } from '@/features/couple/CoupleProvider';
 import { haptics, spring, useTheme } from '@/theme';
+import { ConfettiBurst } from './Confetti';
 import {
   BackLayer,
   BandanaLayer,
@@ -47,6 +51,9 @@ import {
   ZzzLayer,
 } from './mochi/parts';
 import { useBulldogStore } from './store';
+
+/** Sparkle gold for `proud` — decorative art constant, like Mochi's coat. */
+const SPARKLE = '#F5B942';
 
 interface BulldogViewProps {
   size?: number;
@@ -81,8 +88,11 @@ export function BulldogView({ size = 120 }: BulldogViewProps) {
   const zzzDrift = useSharedValue(0);
   const heartOpacity = useSharedValue(0);
   const heartY = useSharedValue(0);
+  const sparkleOpacity = useSharedValue(0);
+  const sparkleScale = useSharedValue(0.6);
 
   const sleepy = mood === 'sleepy';
+  const pouty = mood === 'pout';
 
   // ── idle life: breathing loop ────────────────────────────────────
   useEffect(() => {
@@ -102,8 +112,9 @@ export function BulldogView({ size = 120 }: BulldogViewProps) {
   }, [reduceMotion, sleepy, breathe]);
 
   // ── idle life: randomized blinks + occasional ear flick + pupil drift ──
+  // Idle only: the flicks share backLag with the pout droop and the transient moves.
   useEffect(() => {
-    if (reduceMotion || sleepy) return;
+    if (reduceMotion || mood !== 'idle') return;
     let alive = true;
     let timer: ReturnType<typeof setTimeout>;
     const schedule = () => {
@@ -127,14 +138,27 @@ export function BulldogView({ size = 120 }: BulldogViewProps) {
       alive = false;
       clearTimeout(timer);
     };
-  }, [reduceMotion, sleepy, eyeScaleY, backLag, pupilShift]);
+  }, [reduceMotion, mood, eyeScaleY, backLag, pupilShift]);
+
+  // ── pout: sustained droop — jowls sag, ears wilt (a face, never a message) ──
+  useEffect(() => {
+    const jowl = pouty ? 5 : 0;
+    const ears = pouty ? -7 : 0;
+    if (reduceMotion) {
+      jowlDrop.value = jowl;
+      backLag.value = ears;
+      return;
+    }
+    jowlDrop.value = withSpring(jowl, spring.default);
+    backLag.value = withSpring(ears, spring.default);
+  }, [pouty, reduceMotion, jowlDrop, backLag]);
 
   // ── expression overlays follow the mood (crossfades = timing, fades only) ──
   useEffect(() => {
-    const happyFace = mood === 'happy' || mood === 'love';
+    const happyFace = mood === 'happy' || mood === 'love' || mood === 'party' || mood === 'proud';
     const fade = (to: number) => withTiming(to, { duration: reduceMotion ? 0 : 160 });
     arcsOpacity.value = fade(happyFace ? 1 : 0);
-    openMouthOpacity.value = fade(mood === 'happy' ? 1 : 0);
+    openMouthOpacity.value = fade(mood === 'happy' || mood === 'party' ? 1 : 0);
     lidsOpacity.value = fade(sleepy ? 1 : 0);
     zzzOpacity.value = sleepy ? fade(1) : fade(0);
   }, [mood, sleepy, reduceMotion, arcsOpacity, openMouthOpacity, lidsOpacity, zzzOpacity]);
@@ -157,7 +181,7 @@ export function BulldogView({ size = 120 }: BulldogViewProps) {
 
   // ── transient mood choreography ──────────────────────────────────
   useEffect(() => {
-    if (mood === 'idle' || mood === 'sleepy' || reduceMotion) return;
+    if (mood === 'idle' || mood === 'sleepy' || mood === 'pout' || reduceMotion) return;
 
     if (mood === 'happy') {
       wiggle.value = withSequence(
@@ -175,6 +199,44 @@ export function BulldogView({ size = 120 }: BulldogViewProps) {
         60,
         withSequence(withSpring(-4, spring.bouncy), withSpring(4, spring.bouncy), withSpring(0, spring.default)),
       );
+    } else if (mood === 'party') {
+      // Zoomies-at-home: double hop, big wiggles, soft parts flying a beat behind.
+      wiggle.value = withSequence(
+        withSpring(-11, spring.bouncy),
+        withSpring(11, spring.bouncy),
+        withSpring(-7, spring.bouncy),
+        withSpring(0, spring.default),
+      );
+      hop.value = withSequence(
+        withSpring(-20, spring.bouncy),
+        withSpring(0, spring.default),
+        withSpring(-13, spring.bouncy),
+        withSpring(0, spring.default),
+      );
+      jowlDrop.value = withDelay(
+        80,
+        withSequence(withSpring(5, spring.bouncy), withSpring(0, spring.default)),
+      );
+      backLag.value = withDelay(
+        60,
+        withSequence(withSpring(-6, spring.bouncy), withSpring(6, spring.bouncy), withSpring(0, spring.default)),
+      );
+    } else if (mood === 'proud') {
+      // Sits tall and HOLDS it — chest up, sparkles by the ears.
+      squish.value = withSequence(
+        withSpring(1.08, spring.default),
+        withDelay(1100, withSpring(1, spring.default)),
+      );
+      hop.value = withSequence(
+        withSpring(-5, spring.default),
+        withDelay(1100, withSpring(0, spring.default)),
+      );
+      sparkleScale.value = 0.6;
+      sparkleScale.value = withSpring(1, spring.bouncy);
+      sparkleOpacity.value = withSequence(
+        withTiming(1, { duration: 150 }),
+        withDelay(1250, withTiming(0, { duration: 170 })),
+      );
     } else if (mood === 'love') {
       wiggle.value = withSequence(withSpring(6, spring.bouncy), withSpring(0, spring.default));
       heartOpacity.value = withSequence(
@@ -187,15 +249,16 @@ export function BulldogView({ size = 120 }: BulldogViewProps) {
       );
     }
 
-    const t = setTimeout(() => setIdle(), 1100);
+    const holdMs = mood === 'party' ? 1700 : mood === 'proud' ? 1900 : 1100;
+    const t = setTimeout(() => setIdle(), holdMs);
     return () => clearTimeout(t);
-  }, [mood, nonce, reduceMotion, wiggle, hop, jowlDrop, backLag, heartOpacity, heartY, setIdle, size]);
+  }, [mood, nonce, reduceMotion, wiggle, hop, squish, jowlDrop, backLag, heartOpacity, heartY, sparkleOpacity, sparkleScale, setIdle, size]);
 
-  // ── boop: squish + eye squeeze; wakes a sleepy pup with a snort ──
+  // ── boop: squish + eye squeeze; wakes a sleepy pup, cheers a pouty one ──
   function boop() {
     haptics.tick();
-    if (sleepy) {
-      // snort awake
+    if (sleepy || pouty) {
+      // snort awake / perk right up
       if (!reduceMotion) {
         wiggle.value = withSequence(
           withSpring(-5, spring.press),
@@ -258,6 +321,10 @@ export function BulldogView({ size = 120 }: BulldogViewProps) {
     opacity: heartOpacity.value,
     transform: [{ translateY: heartY.value }],
   }));
+  const sparkleStyle = useAnimatedStyle(() => ({
+    opacity: sparkleOpacity.value,
+    transform: [{ scale: sparkleScale.value }],
+  }));
 
   const layer = StyleSheet.absoluteFill;
 
@@ -304,6 +371,13 @@ export function BulldogView({ size = 120 }: BulldogViewProps) {
             size={Math.max(20, size * 0.24)}
           />
         </Animated.View>
+        <Animated.View pointerEvents="none" style={[styles.sparkleLeft, sparkleStyle]}>
+          <Sparkles color={SPARKLE} fill={SPARKLE} size={Math.max(16, size * 0.18)} />
+        </Animated.View>
+        <Animated.View pointerEvents="none" style={[styles.sparkleRight, sparkleStyle]}>
+          <Sparkles color={SPARKLE} fill={SPARKLE} size={Math.max(12, size * 0.13)} />
+        </Animated.View>
+        <ConfettiBurst nonce={mood === 'party' ? nonce : 0} spread={size} />
       </Animated.View>
     </Pressable>
   );
@@ -311,4 +385,6 @@ export function BulldogView({ size = 120 }: BulldogViewProps) {
 
 const styles = StyleSheet.create({
   heart: { position: 'absolute', top: 0, alignSelf: 'center', zIndex: 1 },
+  sparkleLeft: { position: 'absolute', top: '6%', left: '-4%', zIndex: 1 },
+  sparkleRight: { position: 'absolute', top: '18%', right: '-2%', zIndex: 1 },
 });

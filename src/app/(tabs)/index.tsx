@@ -1,5 +1,6 @@
-import { useRouter } from 'expo-router';
-import { lazy, Suspense, useEffect, useState } from 'react';
+import { useFocusEffect, useRouter } from 'expo-router';
+import { Stamp } from 'lucide-react-native';
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import { Button } from '@/components/button';
@@ -8,44 +9,104 @@ import { Screen } from '@/components/screen';
 import { Text } from '@/components/text';
 import { BulldogView } from '@/features/bulldog/BulldogView';
 import { useBulldogStore } from '@/features/bulldog/store';
+import { useAuth } from '@/features/auth/AuthProvider';
 import { useCouple } from '@/features/couple/CoupleProvider';
 import { GoalCard } from '@/features/goals/GoalCard';
-import { useWeeklyGoals } from '@/features/goals/hooks';
+import { useActivity, useAllGoals } from '@/features/goals/hooks';
+import {
+  completedWeeks,
+  goalsForPeriod,
+  isSealed,
+  pendingSeals,
+  weeklyPulse,
+  weeklyStreak,
+} from '@/features/goals/ladder';
+import { quarterPeriod, weekPeriod, yearPeriod } from '@/features/goals/period';
+import { PulseRing } from '@/features/goals/PulseRing';
+import { StreakDoodles } from '@/features/goals/StreakDoodles';
 import { Ticker } from '@/features/goals/Ticker';
 import { haptics, radius, spacing, useTheme } from '@/theme';
 
 // Experimental 3D pup — lazy so three.js only evaluates when toggled on.
 const Pup3DStage = lazy(() => import('@/features/bulldog/pup3d/Pup3DStage'));
 
-/** The Den — bulldog + today strip + partner ticker. The daily landing. */
+const QUIET_DAYS_FOR_POUT = 3;
+
+/** The Den — bulldog + weekly pulse + today strip + partner ticker. The daily landing. */
 export default function DenScreen() {
   const router = useRouter();
   const { colors } = useTheme();
+  const { user } = useAuth();
   const { coupleId, couple } = useCouple();
-  const { goals } = useWeeklyGoals(coupleId);
+  const { goals } = useAllGoals(coupleId);
+  const { items: activity } = useActivity(coupleId, 5);
   const trigger = useBulldogStore((s) => s.trigger);
   const mood = useBulldogStore((s) => s.mood);
   const [show3d, setShow3d] = useState(false);
 
   const bulldogName = couple?.bulldog.name || 'Your bulldog';
   const paired = (couple?.members.length ?? 1) >= 2;
+  const thisWeek = weekPeriod();
 
-  // Evening with nothing checked in today → sleepy pup (boop to wake).
+  // Quiet couple → pout (both partners, 3+ days — a face, never a message).
+  // Otherwise: evening with nothing happening → sleepy. Boop fixes either.
   useEffect(() => {
-    const hour = new Date().getHours();
-    if (hour >= 20 && mood === 'idle') {
+    if (mood !== 'idle') return;
+    const latest =
+      activity[0]?.at?.toMillis?.() ?? couple?.createdAt?.toMillis?.() ?? Date.now();
+    const quietDays = (Date.now() - latest) / 86_400_000;
+    if (quietDays >= QUIET_DAYS_FOR_POUT) {
+      trigger('pout');
+    } else if (new Date().getHours() >= 20) {
       trigger('sleepy');
     }
-    // Run once on mount only.
+    // React to activity arriving, not to every mood flip.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [activity]);
+
+  // A shared goal getting its second paw while we're HERE → party on this phone
+  // too (the seal screen handles its own slam; focus check = exactly one party).
+  const focusedRef = useRef(true);
+  useFocusEffect(
+    useCallback(() => {
+      focusedRef.current = true;
+      return () => {
+        focusedRef.current = false;
+      };
+    }, []),
+  );
+  const sealedSeen = useRef(new Map<string, boolean>());
+  useEffect(() => {
+    for (const g of goals) {
+      if (g.owner !== 'shared') continue;
+      const was = sealedSeen.current.get(g.id);
+      const now = isSealed(g);
+      if (was === false && now && focusedRef.current) {
+        haptics.celebration();
+        trigger('party');
+      }
+      sealedSeen.current.set(g.id, now);
+    }
+  }, [goals, trigger]);
 
   if (!coupleId || !couple) return null;
 
-  // Today strip: up to 4 unfinished-first goals to act on now.
-  const strip = [...goals]
-    .sort((a, b) => Number(a.owner !== 'shared') - Number(b.owner !== 'shared'))
-    .slice(0, 4);
+  const weeklyGoals = goalsForPeriod(goals, 'week', thisWeek);
+  const strip = weeklyGoals.slice(0, 4);
+
+  // Weekly pulse: both partners fill the ring from opposite ends.
+  const pulse = weeklyPulse(goals, thisWeek, couple.members);
+  const [uidA, uidB] = couple.members;
+  const fractionOf = (uid?: string) =>
+    pulse.targetTotal > 0 && uid ? (pulse.byUid[uid] ?? 0) / pulse.targetTotal : 0;
+
+  // Streak doodles on the den wall.
+  const streak = weeklyStreak(completedWeeks(goals), thisWeek);
+
+  // Shared pacts still waiting for MY paw in the wax.
+  const needsSeal = user
+    ? pendingSeals(goals, user.uid, [thisWeek, quarterPeriod(), yearPeriod()])
+    : [];
 
   return (
     <Screen>
@@ -56,12 +117,27 @@ export default function DenScreen() {
               <Pup3DStage height={240} />
             </Suspense>
           ) : (
-            <BulldogView size={120} />
+            <View style={styles.pupWall}>
+              <StreakDoodles streak={streak} size={130} />
+              <PulseRing
+                size={164}
+                fractionA={fractionOf(uidA)}
+                fractionB={fractionOf(uidB)}
+                colorA={couple.partnerColors[uidA] ?? colors.primary}
+                colorB={(uidB && couple.partnerColors[uidB]) || colors.secondary}>
+                <BulldogView size={118} />
+              </PulseRing>
+            </View>
           )}
           <Text variant="title">{bulldogName}’s Den</Text>
           <Text variant="caption" color="textSecondary">
             {paired ? 'boop the pup · tap a goal to check in' : 'waiting for your partner 🐾'}
           </Text>
+          {streak >= 2 ? (
+            <Text variant="caption" color="textSecondary">
+              {streak} weeks of doodles on the wall 🖍️
+            </Text>
+          ) : null}
           <Pressable
             accessibilityRole="button"
             accessibilityState={{ selected: show3d }}
@@ -81,6 +157,27 @@ export default function DenScreen() {
             </Text>
           </Pressable>
         </View>
+
+        {needsSeal.length > 0 ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`Seal ${needsSeal[0].title}`}
+            onPress={() => {
+              haptics.tick();
+              router.push(`/seal/${needsSeal[0].id}`);
+            }}
+            style={[styles.sealNudge, { backgroundColor: colors.muted, borderColor: colors.border }]}>
+            <Stamp size={22} color={colors.primary} />
+            <View style={styles.sealNudgeText}>
+              <Text variant="label" numberOfLines={1}>
+                “{needsSeal[0].title}” is waiting for your paw
+              </Text>
+              <Text variant="caption" color="textSecondary">
+                a pact needs both seals 💌
+              </Text>
+            </View>
+          </Pressable>
+        ) : null}
 
         {strip.length > 0 ? (
           <View style={styles.section}>
@@ -116,6 +213,7 @@ export default function DenScreen() {
 const styles = StyleSheet.create({
   scroll: { gap: spacing.xl, paddingBottom: spacing.xxl },
   hero: { alignItems: 'center', gap: spacing.xs, paddingTop: spacing.md },
+  pupWall: { alignItems: 'center', justifyContent: 'center' },
   betaChip: {
     marginTop: spacing.xs,
     paddingHorizontal: spacing.md,
@@ -123,6 +221,15 @@ const styles = StyleSheet.create({
     borderRadius: radius.pill,
     borderWidth: 1,
   },
+  sealNudge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    borderRadius: radius.lg,
+    borderWidth: 1.5,
+    padding: spacing.lg,
+  },
+  sealNudgeText: { flex: 1, gap: 2 },
   section: { gap: spacing.sm },
   cards: { gap: spacing.md },
   center: { textAlign: 'center' },

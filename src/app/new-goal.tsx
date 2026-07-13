@@ -1,12 +1,20 @@
 /**
- * New weekly goal (modal). Title + emoji charm + who it's for + paws-per-week.
- * Quarterly/yearly goals + ladder linking land in M3.
+ * New goal (modal) — any horizon. Title + emoji charm + who it's for + paws.
+ * Weekly/quarterly goals can link one rung up the ladder ("climbs toward…"),
+ * and creating a SHARED goal hands off to the seal ceremony (both paws in wax).
  */
 
 import { useRouter } from 'expo-router';
 import { Minus, Plus } from 'lucide-react-native';
 import { useState } from 'react';
-import { KeyboardAvoidingView, Platform, Pressable, StyleSheet, View } from 'react-native';
+import {
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  View,
+} from 'react-native';
 
 import { Button } from '@/components/button';
 import { Screen } from '@/components/screen';
@@ -15,23 +23,47 @@ import { TextField } from '@/components/text-field';
 import { useAuth } from '@/features/auth/AuthProvider';
 import { useCouple } from '@/features/couple/CoupleProvider';
 import { createGoal } from '@/features/goals/api';
+import { useAllGoals } from '@/features/goals/hooks';
+import { goalsForPeriod } from '@/features/goals/ladder';
+import { currentPeriod, parentHorizon, type Horizon } from '@/features/goals/period';
 import { db } from '@/lib/firebase';
 import { haptics, radius, spacing, touchTarget, useTheme } from '@/theme';
 
 const CHARMS = ['🎯', '🏃', '🍳', '💪', '📚', '🌱', '💰', '🧘', '🎨', '✈️', '🏡', '💌'];
+
+const HORIZONS: { value: Horizon; label: string }[] = [
+  { value: 'week', label: 'This week' },
+  { value: 'quarter', label: 'This quarter' },
+  { value: 'year', label: 'This year' },
+];
+
+const TITLES: Record<Horizon, string> = {
+  week: 'A new goal for the week',
+  quarter: 'A goal for the quarter',
+  year: 'A dream for the year',
+};
 
 export default function NewGoalScreen() {
   const router = useRouter();
   const { colors } = useTheme();
   const { user } = useAuth();
   const { coupleId } = useCouple();
+  const { goals } = useAllGoals(coupleId);
 
   const [title, setTitle] = useState('');
   const [charm, setCharm] = useState(CHARMS[0]);
+  const [horizon, setHorizon] = useState<Horizon>('week');
   const [owner, setOwner] = useState<'me' | 'shared'>('shared');
   const [units, setUnits] = useState(3);
+  const [parentGoalId, setParentGoalId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | undefined>();
+
+  // Ladder linking: this goal can climb toward a current bigger goal one rung up.
+  const up = parentHorizon(horizon);
+  const parentCandidates = up ? goalsForPeriod(goals, up, currentPeriod(up)) : [];
+
+  const maxUnits = horizon === 'week' ? 10 : 12;
 
   async function save() {
     if (!user || !coupleId) return;
@@ -42,39 +74,46 @@ export default function NewGoalScreen() {
     setError(undefined);
     setBusy(true);
     try {
-      await createGoal(db, {
+      const goalId = await createGoal(db, {
         coupleId,
         uid: user.uid,
         title,
         charm,
-        horizon: 'week',
+        horizon,
         owner: owner === 'shared' ? 'shared' : user.uid,
         targetUnits: units,
+        parentGoalId,
       });
       haptics.success();
-      router.back();
+      if (owner === 'shared') {
+        // A pact deserves a moment: straight into the seal ceremony.
+        router.replace(`/seal/${goalId}?armed=1`);
+      } else {
+        router.back();
+      }
     } catch {
       setError('Couldn’t save that just now — try again?');
       setBusy(false);
     }
   }
 
-  const ownerChip = (value: 'me' | 'shared', label: string) => (
+  const chip = (selected: boolean, label: string, onPress: () => void, key?: string) => (
     <Pressable
+      key={key ?? label}
       accessibilityRole="button"
-      accessibilityState={{ selected: owner === value }}
+      accessibilityState={{ selected }}
       onPress={() => {
         haptics.tick();
-        setOwner(value);
+        onPress();
       }}
       style={[
         styles.chip,
         {
-          backgroundColor: owner === value ? colors.primary : colors.muted,
-          borderColor: owner === value ? colors.primary : colors.border,
+          backgroundColor: selected ? colors.primary : colors.muted,
+          borderColor: selected ? colors.primary : colors.border,
         },
       ]}>
-      <Text variant="label" color={owner === value ? 'onPrimary' : 'text'}>
+      <Text variant="label" color={selected ? 'onPrimary' : 'text'}>
         {label}
       </Text>
     </Pressable>
@@ -85,14 +124,35 @@ export default function NewGoalScreen() {
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={styles.flex}>
-        <View style={styles.body}>
-          <Text variant="title">A new goal for the week</Text>
+        <ScrollView
+          style={styles.flex}
+          contentContainerStyle={styles.body}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled">
+          <Text variant="title">{TITLES[horizon]}</Text>
+
+          <View style={styles.section}>
+            <View style={styles.chips}>
+              {HORIZONS.map((h) =>
+                chip(
+                  horizon === h.value,
+                  h.label,
+                  () => {
+                    setHorizon(h.value);
+                    setParentGoalId(null); // the rung above changed
+                    setUnits((u) => Math.min(u, h.value === 'week' ? 10 : 12));
+                  },
+                  h.value,
+                ),
+              )}
+            </View>
+          </View>
 
           <TextField
             label="What are we doing?"
             value={title}
             onChangeText={setTitle}
-            placeholder="e.g. Run together 3x"
+            placeholder={horizon === 'week' ? 'e.g. Run together 3x' : 'e.g. Save for Kyoto'}
             maxLength={60}
             error={error}
           />
@@ -129,14 +189,43 @@ export default function NewGoalScreen() {
               Whose goal?
             </Text>
             <View style={styles.chips}>
-              {ownerChip('shared', 'Ours together')}
-              {ownerChip('me', 'Just mine')}
+              {chip(owner === 'shared', 'Ours together', () => setOwner('shared'))}
+              {chip(owner === 'me', 'Just mine', () => setOwner('me'))}
             </View>
+            {owner === 'shared' ? (
+              <Text variant="caption" color="textSecondary">
+                shared goals end with the seal — both paws in the wax 💌
+              </Text>
+            ) : null}
           </View>
+
+          {parentCandidates.length > 0 ? (
+            <View style={styles.section}>
+              <Text variant="label" color="textSecondary">
+                Climbs toward… (optional)
+              </Text>
+              <Text variant="caption" color="textSecondary">
+                every paw here nudges the bigger bar 🪜
+              </Text>
+              <View style={styles.chips}>
+                {chip(parentGoalId === null, `Just this ${horizon}`, () => setParentGoalId(null))}
+                {parentCandidates.map((p) =>
+                  chip(
+                    parentGoalId === p.id,
+                    `${p.charm} ${p.title.length > 18 ? `${p.title.slice(0, 18)}…` : p.title}`,
+                    () => setParentGoalId(p.id),
+                    p.id,
+                  ),
+                )}
+              </View>
+            </View>
+          ) : null}
 
           <View style={styles.section}>
             <Text variant="label" color="textSecondary">
-              Paw prints to fill this week
+              {horizon === 'week'
+                ? 'Paw prints to fill this week'
+                : 'Paw prints to fill (linked weekly goals count too)'}
             </Text>
             <View style={styles.stepper}>
               <Pressable
@@ -155,14 +244,14 @@ export default function NewGoalScreen() {
                 accessibilityLabel="More paws"
                 onPress={() => {
                   haptics.tick();
-                  setUnits((u) => Math.min(10, u + 1));
+                  setUnits((u) => Math.min(maxUnits, u + 1));
                 }}
                 style={[styles.stepBtn, { backgroundColor: colors.muted }]}>
                 <Plus color={colors.text} size={20} />
               </Pressable>
             </View>
           </View>
-        </View>
+        </ScrollView>
 
         <View style={styles.footer}>
           <Button label="Add our goal" onPress={save} loading={busy} />
@@ -175,7 +264,7 @@ export default function NewGoalScreen() {
 
 const styles = StyleSheet.create({
   flex: { flex: 1 },
-  body: { flex: 1, gap: spacing.lg, paddingTop: spacing.md },
+  body: { gap: spacing.lg, paddingTop: spacing.md, paddingBottom: spacing.lg },
   section: { gap: spacing.sm },
   charms: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
   charmCell: {
@@ -187,7 +276,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   charmGlyph: { fontSize: 24 },
-  chips: { flexDirection: 'row', gap: spacing.sm },
+  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   chip: {
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,

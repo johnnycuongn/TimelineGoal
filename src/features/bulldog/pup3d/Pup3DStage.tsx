@@ -31,9 +31,10 @@ import { useBulldogStore } from '../store';
 
 const CLIP = {
   idle: 'Idle',
-  sleepyIdle: 'Idle_2_HeadLow',
-  jump: 'Gallop_Jump',
+  sleepyIdle: 'Idle_2_HeadLow', // doubles as the pout slump
+  jump: 'Gallop_Jump', // happy AND party (the shiba's best move)
   love: 'Idle_HitReact_Right',
+  proud: 'Idle_HitReact_Left',
 } as const;
 
 /** Latte tints for the coat (eye materials left untouched). */
@@ -86,8 +87,8 @@ function PupModel() {
     g.rotation.y = -0.35;
   }, [gltf.scene]);
 
-  // Base loop follows mood (sleepy gets the head-low idle).
-  const baseClip = mood === 'sleepy' ? CLIP.sleepyIdle : CLIP.idle;
+  // Base loop follows mood (sleepy AND pout get the head-low idle).
+  const baseClip = mood === 'sleepy' || mood === 'pout' ? CLIP.sleepyIdle : CLIP.idle;
   useEffect(() => {
     const base = actions[baseClip];
     if (!base) return;
@@ -98,12 +99,17 @@ function PupModel() {
     };
   }, [actions, mixer, baseClip, reduceMotion]);
 
-  // Transient clips on mood triggers: jump on happy, head-tilt on love.
+  // Transient clips on mood triggers: jump on happy/party, head-tilts on love/proud.
   useEffect(() => {
     if (reduceMotion) return;
-    if (mood !== 'happy' && mood !== 'love') return;
+    if (mood !== 'happy' && mood !== 'party' && mood !== 'love' && mood !== 'proud') return;
     const base = actions[baseClip];
-    const move = actions[mood === 'happy' ? CLIP.jump : CLIP.love];
+    const move =
+      mood === 'happy' || mood === 'party'
+        ? actions[CLIP.jump]
+        : mood === 'proud'
+          ? (actions[CLIP.proud] ?? actions[CLIP.love]) // fall back if the GLB lacks Left
+          : actions[CLIP.love];
     if (!base || !move) return;
 
     move.reset().setLoop(LoopOnce, 1);
@@ -147,9 +153,7 @@ function LoadingCube() {
   });
   return (
     <mesh ref={ref}>
-      {/* eslint-disable-next-line react/no-unknown-property */}
       <boxGeometry args={[0.7, 0.7, 0.7]} />
-      {/* eslint-disable-next-line react/no-unknown-property */}
       <meshStandardMaterial color="#D9B48A" />
     </mesh>
   );

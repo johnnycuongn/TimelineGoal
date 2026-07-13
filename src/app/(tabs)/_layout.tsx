@@ -63,7 +63,8 @@ export default function TabsLayout() {
 
 /** Build a tabBarIcon renderer for a Lucide icon (color/size supplied by the navigator). */
 function icon(Glyph: LucideIcon) {
-  return ({ color, size }: { color: ColorValue; size: number }) => (
+  const TabBarIcon = ({ color, size }: { color: ColorValue; size: number }) => (
     <Glyph color={color as string} size={size} strokeWidth={2.25} />
   );
+  return TabBarIcon;
 }

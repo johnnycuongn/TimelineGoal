@@ -62,6 +62,7 @@ export default function RootLayout() {
                 <Stack.Screen name="(onboarding)" />
                 <Stack.Screen name="(tabs)" />
                 <Stack.Screen name="new-goal" options={{ presentation: 'modal' }} />
+                <Stack.Screen name="seal/[goalId]" options={{ presentation: 'modal' }} />
               </Stack>
             </CoupleProvider>
           </AuthProvider>

@@ -24,10 +24,9 @@ export default function Pup3DTestScreen() {
           <color attach="background" args={['#ff00aa']} />
           {/* eslint-disable-next-line react/no-unknown-property */}
           <ambientLight intensity={1.5} />
+          {/* eslint-disable-next-line react/no-unknown-property */}
           <mesh rotation={[0.6, 0.8, 0]}>
-            {/* eslint-disable-next-line react/no-unknown-property */}
             <boxGeometry args={[1.2, 1.2, 1.2]} />
-            {/* eslint-disable-next-line react/no-unknown-property */}
             <meshStandardMaterial color="#ff8800" />
           </mesh>
         </Canvas>

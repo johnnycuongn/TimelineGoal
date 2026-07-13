@@ -1,20 +1,23 @@
 /**
  * The bulldog's mood — a tiny UI state machine (see motion-spec skill).
- * Screens trigger moods; BulldogView renders them. Transient moods (happy, love)
- * auto-return to idle after their moment.
+ * Screens trigger moods; BulldogView renders them.
  *
- * States wired in M2: idle · happy · sleepy · love. party/proud/pout land in M3.
+ * Transient (auto-return to idle in the view): happy · love · party · proud
+ * Persistent (until booped/cheered):           idle · sleepy · pout
+ *
+ * party = goal completed / seal slam (+confetti) · proud = quarter/year milestone
+ * pout  = 3+ quiet days for BOTH partners (droopy jowls only — never text-guilt)
  */
 
 import { create } from 'zustand';
 
-export type BulldogMood = 'idle' | 'happy' | 'sleepy' | 'love';
+export type BulldogMood = 'idle' | 'happy' | 'party' | 'proud' | 'sleepy' | 'pout' | 'love';
 
 interface BulldogState {
   mood: BulldogMood;
   /** Bumps every trigger so repeat moods re-animate. */
   nonce: number;
-  /** Trigger a transient mood (returns to idle automatically in the view). */
+  /** Trigger a mood (transient ones return to idle automatically in the view). */
   trigger: (mood: BulldogMood) => void;
   setIdle: () => void;
 }
