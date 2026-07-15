@@ -1,6 +1,16 @@
-# 3D pup model — provenance
+# 3D pup models — provenance
 
-- **Current model**: shiba.glb — Quaternius "Ultimate Animated Animal Pack" via Poly Pizza
+- **bulldog-puppy.glb** — "Bulldog Puppy" by **doinspire** (realistic stage — Den toggle)
+  - https://sketchfab.com/3d-models/bulldog-puppy-7081c9c27df244bf84774361888f58a2
+  - **License: CC Attribution 4.0 (CC-BY 4.0)** — attribution REQUIRED. Credit line:
+    “Bulldog Puppy” by doinspire, licensed under CC BY 4.0
+    (https://creativecommons.org/licenses/by/4.0/). Ship an in-app credit (M5 Us tab).
+  - ~21.6k tris, 3 meshes; materials `Body` (baseColor + normal, 1024² PNG) and `Eyes`
+    (baseColor 1024² PNG), embedded; STATIC (no rig/animations); glTF 2.0, no extensions
+  - Downloaded 2026-07-15 from the Objaverse mirror (allenai/objaverse on Hugging Face,
+    uid 7081c9c27df244bf84774361888f58a2) — CC-licensed Sketchfab models, auth-free
+
+- **shiba.glb** — Quaternius "Ultimate Animated Animal Pack" via Poly Pizza (stylized stage)
   - https://poly.pizza/m/y4wdQpg767 · Author: Quaternius (https://quaternius.com)
   - **License: CC0 1.0** (public domain) — no attribution required (given anyway with thanks!)
   - ~1,950 tris, no textures, real eye meshes (Eyes_White/Pupil/Black materials)

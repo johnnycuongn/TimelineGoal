@@ -28,7 +28,9 @@ import { Ticker } from '@/features/goals/Ticker';
 import { haptics, radius, spacing, useTheme } from '@/theme';
 
 // Experimental 3D pup — lazy so three.js only evaluates when toggled on.
-const Pup3DStage = lazy(() => import('@/features/bulldog/pup3d/Pup3DStage'));
+// Currently the realistic CC-BY bulldog puppy (docs/design/frenchie-3d-design.md);
+// swap back to './Pup3DStage' for the stylized animated shiba.
+const Pup3DStage = lazy(() => import('@/features/bulldog/pup3d/RealisticPupStage'));
 
 const QUIET_DAYS_FOR_POUT = 3;
 
