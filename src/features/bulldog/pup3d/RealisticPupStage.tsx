@@ -8,19 +8,29 @@
  * tone mapping. Design + sourcing notes: docs/design/frenchie-3d-design.md.
  *
  * Model: CC-BY "Bulldog Puppy" by doinspire (assets/models/MODEL-LICENSE.md) —
- * a STATIC photoscan-grade mesh (no rig, no morphs), so emotions are procedural,
- * self-calibrated from the mesh at mount (nothing hand-tuned to this GLB):
+ * a STATIC photoscan-grade mesh (no rig, no morphs), so ALL life is procedural,
+ * self-calibrated from the mesh at mount (nothing hand-tuned to this GLB).
  *
- *   happy (trigger 'happy'/'party')  — double/triple hop with squash-and-stretch
- *     landings, a little body shimmy, FAST tail wag (vertex-shader bend around
- *     the auto-detected tail tip) and a pink tongue blep sliding out of the
- *     auto-detected muzzle. Happy EYES need morph targets a scan doesn't have —
- *     that lands with the rigged-model upgrade path (see design doc).
- *   sad   (trigger 'pout'/'sleepy')  — tail droops, nose dips, breathing slows.
- *   neutral (idle)                   — soft breathing + a lazy occasional sway.
+ * A rig-less scan can't leg-walk, so "alive" is whole-body: a per-frame loop damps
+ * the mesh toward posture TARGETS (yaw/pitch/roll/x/z/sink/mouth) and layers
+ * OSCILLATORS (breath, step-bob, tail wag, shake) on top. What those targets are
+ * is decided by pupBehaviors.ts — an ethogram + weighted scheduler:
  *
- * Horizontal drag spins the turntable (user-driven, so fine under Reduce Motion).
- * The GL canvas eats touches — gestures live on a transparent overlay ABOVE it.
+ *   neutral (idle) — the pup LIVES here: autonomously looks around, tilts his head
+ *     (wondering), gazes up, sniffs the floor, trots to a new spot, turns around,
+ *     shakes off, pants, play-bows, sits, wag-bursts, barks — with relaxed pauses
+ *     between. Occasionally a full nap: yawn → lie down → sleep (deep breath +
+ *     dream-twitch) → wake + stretch.
+ *   sad   ('pout')   — sighs, looks away, lies down glumly; tail tucked.
+ *   sleepy           — drops straight into the nap cycle (boop to wake).
+ *   happy/party/love/proud — scripted here: hop(s) + fast wag + tongue + shimmy,
+ *     party adds a joy-spin. (Happy EYES need morph targets a scan lacks — that
+ *     lands with the rigged-model upgrade path; see the design doc.)
+ *
+ * Everything is damped, so a real check-in interrupts a yawn and eases over.
+ * Reduce Motion → the scheduler is off and the pup holds still (motion-spec).
+ * Horizontal drag spins the turntable; tap bounces him. The GL canvas eats
+ * touches, so gestures live on a transparent overlay ABOVE it.
  */
 /* eslint-disable react/no-unknown-property -- react-three-fiber JSX sets three.js object properties */
 
@@ -46,6 +56,19 @@ import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment
 import { Text } from '@/components/text';
 import { haptics, spacing } from '@/theme';
 import { useBulldogStore } from '../store';
+import {
+  behaviorDuration,
+  BEHAVIORS,
+  neutralOsc,
+  neutralTarget,
+  nextGap,
+  pickBehavior,
+  resetOsc,
+  resetTarget,
+  type Pool,
+  type PupOsc,
+  type PupTarget,
+} from './pupBehaviors';
 
 // fiber 9.6.1 still constructs THREE.Clock, which three 0.185 deprecated —
 // library noise we can't fix from app code; keep dev LogBox useful.
@@ -136,7 +159,7 @@ function patchTailWag(
   return set;
 }
 
-function PuppyModel({ spin }: { spin: MutableRefObject<number> }) {
+function PuppyModel({ spin, roam }: { spin: MutableRefObject<number>; roam: number }) {
   const reduceMotion = useReducedMotion();
   const outer = useRef<Group>(null);
   const tongue = useRef<Mesh>(null);
@@ -154,11 +177,25 @@ function PuppyModel({ spin }: { spin: MutableRefObject<number> }) {
   const fit = useRef({ s: 1, halfToFeet: 0, ready: false });
   const hop = useRef({ y: 0, vy: 0, queued: 0 });
   const squash = useRef(0);
-  const wobble = useRef(0);
-  const excite = useRef(0); // 0..1 happiness envelope (wag speed, blep, shimmy)
-  const droop = useRef(0); // 0..1 sadness envelope (tail down, nose dip)
-  const blep = useRef(0);
+  const joySpin = useRef(0); // one-shot celebratory twirl (party), decays to 0
+  const spinCur = useRef(HERO_ANGLE); // damped turntable angle (follows drag)
   const wagSets = useRef<WagSet[]>([]);
+
+  // Damped posture + oscillators the frame loop applies; scratch objects the
+  // behaviors write into each frame (reused, never re-allocated).
+  const cur = useRef<PupTarget>(neutralTarget());
+  const oscCur = useRef<PupOsc>(neutralOsc());
+  const tScratch = useRef<PupTarget>(neutralTarget());
+  const oScratch = useRef<PupOsc>(neutralOsc());
+
+  // Ambient behavior scheduler: the currently-running action + the relax gap
+  // before the next one. Randomness lives only in the frame loop / effects
+  // (never in render), so React-Compiler purity holds.
+  const behav = useRef<{ name: string; elapsed: number; dur: number; params: Record<string, number> } | null>(
+    null,
+  );
+  const gap = useRef(0.6);
+
   const moodRef = useRef(mood);
   useEffect(() => {
     moodRef.current = mood;
@@ -282,12 +319,13 @@ function PuppyModel({ spin }: { spin: MutableRefObject<number> }) {
     fit.current = { s, halfToFeet: (center.y - box.min.y) * s, ready: true };
   }, [gltf.scene, spin]);
 
-  // Transient moods → procedural moves (no rig, so whole-body physics): happy
-  // hops twice, party three times, proud does a chest-pop hop-lite, love
-  // wiggles. Mirrors Pup3DStage's timer-based mood reset so the NEXT
-  // tap/check-in retriggers.
+  // Transient moods → scripted one-shots (no rig, so whole-body physics): happy
+  // hops once, party twice + a joy-spin, proud does a chest-pop hop-lite, love
+  // wiggles (handled continuously in the frame loop). Timer-based reset so the
+  // NEXT tap/check-in retriggers; on reset the ambient scheduler takes back over.
   useEffect(() => {
     if (mood !== 'happy' && mood !== 'party' && mood !== 'love' && mood !== 'proud') return;
+    behav.current = null; // a real feeling interrupts whatever he was ambiently doing
     if (!reduceMotion) {
       if (mood === 'happy') {
         hop.current.vy = HOP_VELOCITY;
@@ -295,10 +333,9 @@ function PuppyModel({ spin }: { spin: MutableRefObject<number> }) {
       } else if (mood === 'party') {
         hop.current.vy = HOP_VELOCITY * 1.15;
         hop.current.queued = 2;
+        joySpin.current = Math.PI * 2; // a full celebratory twirl
       } else if (mood === 'proud') {
         hop.current.vy = HOP_VELOCITY * 0.6;
-      } else {
-        wobble.current = 0.4;
       }
     }
     const timer = setTimeout(setIdle, 1500);
@@ -313,15 +350,71 @@ function PuppyModel({ spin }: { spin: MutableRefObject<number> }) {
     const d = Math.min(dt, 0.05); // clamp long frames so physics never explodes
     const m = moodRef.current;
 
-    // Emotion envelopes (smooth in AND out so nothing ever snaps).
-    const happyNow = m === 'happy' || m === 'party' || m === 'love' || m === 'proud';
-    const sadNow = m === 'sleepy' || m === 'pout';
-    excite.current = MathUtils.damp(excite.current, happyNow && !reduceMotion ? 1 : 0, happyNow ? 8 : 2.2, d);
-    droop.current = MathUtils.damp(droop.current, sadNow ? 1 : 0, 2.5, d);
+    // Desired posture + oscillators for THIS frame — start from neutral, then
+    // let the active mood / behavior write into them.
+    const T = tScratch.current;
+    const O = oScratch.current;
+    resetTarget(T);
+    resetOsc(O);
 
-    // Turntable follows the drag target; happiness adds a tiny shimmy on top.
-    const shimmy = reduceMotion ? 0 : excite.current * Math.sin(t * 9) * 0.06;
-    g.rotation.y = MathUtils.damp(g.rotation.y, spin.current + shimmy, 6, d);
+    const happyNow = m === 'happy' || m === 'party' || m === 'love' || m === 'proud';
+    if (happyNow && !reduceMotion) {
+      // Scripted joy: fast wag + lolling tongue; love adds a side wiggle.
+      O.wagAmp = 0.5;
+      O.wagSpeed = 22;
+      T.mouth = 1;
+      if (m === 'love') T.roll = Math.sin(t * 10) * 0.12;
+    } else if (!reduceMotion) {
+      // Ambient life: pick a pool from the mood and let the scheduler run it.
+      const pool: Pool = m === 'pout' ? 'sad' : m === 'sleepy' ? 'nap' : 'neutral';
+      let b = behav.current;
+      if (b && BEHAVIORS[b.name].pool !== pool) {
+        b = behav.current = null; // mood changed under us — drop the stale action
+        gap.current = 0;
+      }
+      if (!b) {
+        gap.current -= d; // relax at neutral between actions
+        if (gap.current <= 0) {
+          const name = pickBehavior(pool, Math.random);
+          behav.current = {
+            name,
+            elapsed: 0,
+            dur: behaviorDuration(name, Math.random),
+            params: BEHAVIORS[name].init?.(Math.random) ?? {},
+          };
+        }
+      } else {
+        b.elapsed += d;
+        const k = b.elapsed / b.dur;
+        if (k >= 1) {
+          behav.current = null;
+          gap.current = nextGap(pool, Math.random);
+        } else {
+          BEHAVIORS[b.name].run(k, b.params, T, O);
+        }
+      }
+    }
+
+    // Damp the live posture toward the desired one — this is what keeps every
+    // transition springy and lets a mood cut in mid-action without snapping.
+    const C = cur.current;
+    const OC = oscCur.current;
+    C.yaw = MathUtils.damp(C.yaw, T.yaw, 4, d);
+    C.pitch = MathUtils.damp(C.pitch, T.pitch, 5, d);
+    C.roll = MathUtils.damp(C.roll, T.roll, 5, d);
+    C.x = MathUtils.damp(C.x, T.x, 2.4, d);
+    C.z = MathUtils.damp(C.z, T.z, 2.4, d);
+    C.sink = MathUtils.damp(C.sink, T.sink, 3, d);
+    C.mouth = MathUtils.damp(C.mouth, T.mouth, 9, d);
+    OC.wagAmp = MathUtils.damp(OC.wagAmp, O.wagAmp, 7, d);
+    OC.wagSpeed = MathUtils.damp(OC.wagSpeed, O.wagSpeed, 7, d);
+    OC.droop = MathUtils.damp(OC.droop, O.droop, 3, d);
+    OC.bob = MathUtils.damp(OC.bob, O.bob, 7, d);
+    OC.sway = MathUtils.damp(OC.sway, O.sway, 7, d);
+    OC.wobble = MathUtils.damp(OC.wobble, O.wobble, 10, d);
+    OC.breath = MathUtils.damp(OC.breath, O.breath, 3, d);
+    OC.breathRate = MathUtils.damp(OC.breathRate, O.breathRate, 3, d);
+    OC.twitch = O.twitch;
 
     // Hop ballistics; landings charge the squash and chain queued hops.
     if (hop.current.vy !== 0 || hop.current.y > 0) {
@@ -338,36 +431,45 @@ function PuppyModel({ spin }: { spin: MutableRefObject<number> }) {
       }
     }
     squash.current = MathUtils.damp(squash.current, 0, 9, d);
-    wobble.current = MathUtils.damp(wobble.current, 0, 4, d);
+    joySpin.current = MathUtils.damp(joySpin.current, 0, 3, d);
 
-    const breath = reduceMotion ? 0 : Math.sin(t * (sadNow ? 0.9 : 1.7)) * 0.007;
-    const my = 1 - squash.current + breath;
+    // ---- compose the final transform ----
+    const breath = reduceMotion ? 0 : Math.sin(t * 1.7 * OC.breathRate) * 0.007 * OC.breath;
+    const my = 1 + breath - C.sink * 0.12 - squash.current;
+    const grow = 1 + squash.current * 0.5;
+    g.scale.set(s * grow, s * my, s * grow);
 
-    // Squash-and-stretch around the FEET: y-scale changes are compensated in
-    // position so paws stay planted on the floor instead of sinking/floating.
-    g.scale.set(s * (1 + squash.current * 0.5), s * my, s * (1 + squash.current * 0.5));
-    g.position.y = FLOOR_Y + halfToFeet * my + hop.current.y;
-    g.rotation.z = wobble.current * Math.sin(t * 13);
-    g.rotation.x = MathUtils.damp(g.rotation.x, droop.current * 0.09, 2.5, d);
+    const groundLift = halfToFeet * my;
+    const bob = reduceMotion ? 0 : Math.sin(t * 8) * OC.bob;
+    g.position.set(
+      C.x * roam,
+      FLOOR_Y + groundLift + hop.current.y + bob - C.sink * groundLift * 0.55,
+      C.z * roam,
+    );
 
-    // Tail: lazy idle sway → excited blur-wag; sadness pins it down and stills it.
-    const idleSway = reduceMotion ? 0 : Math.sin(t * 2.1) * 0.09 * (0.55 + 0.45 * Math.sin(t * 0.31));
-    const happyWag = Math.sin(t * 21) * 0.5 * excite.current;
-    const wag = (idleSway * (1 - excite.current) + happyWag) * (1 - droop.current * 0.85);
+    const shimmy = happyNow && !reduceMotion ? Math.sin(t * 9) * 0.06 : 0;
+    spinCur.current = MathUtils.damp(spinCur.current, spin.current, 6, d);
+    g.rotation.y = spinCur.current + C.yaw + shimmy + joySpin.current;
+    g.rotation.x = C.pitch;
+    const jitter = OC.twitch ? (Math.random() - 0.5) * OC.twitch : 0;
+    g.rotation.z = reduceMotion
+      ? 0
+      : C.roll + Math.sin(t * 8) * OC.sway + Math.sin(t * 38) * OC.wobble + jitter;
+
+    // Tail bend: wag amplitude/speed from the oscillators; droop pins it down.
+    const wag = reduceMotion ? 0 : Math.sin(t * OC.wagSpeed) * OC.wagAmp;
     for (const u of wagSets.current) {
       u.uWag.value = wag;
       // Negative: rotating rear-side content around `side = up × face` by a
-      // POSITIVE angle lifts the tail (cross(side, rear) points up) — sadness
-      // needs the opposite.
-      u.uDroop.value = -droop.current * 0.55;
+      // POSITIVE angle lifts the tail — sadness needs the opposite.
+      u.uDroop.value = -OC.droop * 0.55;
     }
 
-    // Tongue blep rides the happiness envelope.
-    blep.current = MathUtils.damp(blep.current, excite.current > 0.35 ? 1 : 0, 7, d);
+    // Tongue rides the (damped) mouth-open target — pant, bark, yawn, joy.
     const tng = tongue.current;
     const sn = snout.current;
     if (tng && sn) {
-      const out = blep.current;
+      const out = C.mouth;
       tng.visible = out > 0.02;
       tng.quaternion.copy(sn.quat);
       tng.position
@@ -444,6 +546,9 @@ export default function RealisticPupStage({
   // The iOS SIMULATOR's GL initializes but never presents a frame (verified
   // 2026-07-12). Real iPhones and Android are fine — say so, don't show a void.
   const frame = width != null ? { height, width, alignSelf: 'center' as const } : { height };
+  // Small stages (the Den's pulse ring) get a tighter wander radius so he
+  // roams within the ring instead of trotting out of frame.
+  const roam = width != null && width < 220 ? 0.35 : 1;
 
   if (Platform.OS === 'ios' && !Device.isDevice) {
     return (
@@ -481,7 +586,7 @@ export default function RealisticPupStage({
           <shadowMaterial opacity={0.22} />
         </mesh>
         <Suspense fallback={<LoadingCube />}>
-          <PuppyModel spin={spin} />
+          <PuppyModel spin={spin} roam={roam} />
         </Suspense>
       </Canvas>
       {/* Transparent gesture layer ABOVE the canvas — the GL view eats touches otherwise. */}
@@ -494,7 +599,7 @@ export default function RealisticPupStage({
       </GestureDetector>
       {showHint ? (
         <Text variant="caption" color="textSecondary" style={styles.hint}>
-          real pup (beta) — spin him around, tap for a bounce 🐾
+          watch him potter about · drag to spin · tap for a bounce 🐾
         </Text>
       ) : null}
     </View>

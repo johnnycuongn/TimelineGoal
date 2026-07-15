@@ -108,13 +108,52 @@ for direct feel-testing. Reduce Motion: hops/wag/shimmy off, turntable (user-dri
    "update on a component that hasn't mounted yet" — calibration results live in refs
    the frame loop applies imperatively instead.
 
+## 5b. Ambient life — a full behavior repertoire (2026-07-15, user request)
+
+*"Make it like a real dog I can see and take care of."* A rig-less scan can't leg-walk,
+so "alive" is whole-body: the frame loop damps the mesh toward posture **targets**
+(yaw/pitch/roll/x/z/sink/mouth) and layers **oscillators** (breath, step-bob, tail wag,
+shake, dream-twitch) on top. WHAT those targets are is decided by
+`pupBehaviors.ts` — a pure, unit-tested ethogram + weighted scheduler:
+
+- **neutral (idle)** — the pup LIVES here, autonomously cycling with relaxed pauses
+  between: `lookAround` (scan the room), `headTilt` (the curious "bork?"), `lookUp`,
+  `sniffGround` (nose down + shuffle), `walk` (trot to a new spot with a waddle),
+  `turnAround`, `shakeOff`, `pant` (tongue lolling), `playBow`, `sit`, `wagBurst`,
+  `barkOnce` (windup + lunge, no haptic — ambient). Occasionally a full **`napCycle`**:
+  yawn → lie down → sleep (deep slow breath + rare dream-twitch) → wake + stretch.
+- **sad ('pout')** — `sigh`, `lookAway`, `lieGlum`; tail tucked, breathing slowed.
+- **sleepy** — drops straight into `napCycle` (boop to wake).
+- **happy/party/love/proud** — scripted (hop(s) + fast wag + tongue + shimmy; party
+  adds a joy-spin) and INTERRUPT the ambient action — a check-in cuts a yawn short.
+
+Why damped-targets: every transition is springy and **interruptible** for free (a real
+mood eases in mid-action, never snaps) — motion-spec's first law, applied to a mesh
+with no skeleton. Randomness lives only in the frame loop (`Math.random`), never in
+render, so React-Compiler purity holds. Small stages (the Den ring) get a tighter
+wander radius (`roam`) so he potters within the ring instead of trotting out of frame.
+Reduce Motion → the scheduler is off and he holds still.
+
+`pupBehaviors.ts` is pure (no three/RN imports) and unit-tested (10 tests): every
+behavior well-formed, `run()` emits only finite numbers across its whole 0→1 timeline,
+`pickBehavior` respects pool + weights, durations/gaps bounded, stage clamped.
+
 ## 6. Verification (done 2026-07-15 on the Android emulator — same GL path as iPhone)
 
-Gates: typecheck ✓ · lint 0 errors ✓ · unit 36/36 ✓ · iOS export ✓ (GLB bundled).
-Live, screenshot-proofed in `docs/design/proof/frenchie3d-*.png`: embedded 1K PBR
-textures render (the historically-broken RN path — field-confirmed), RoomEnvironment
-PMREM + ACES + PCF contact shadow, auto-framing, turntable drag, tap-hop with squash
-landing, tail wag oscillating across frames (left in `happy-hop-wag`, right in
-`happy-blep`), tongue blep, sad droop + slump. **iOS feel-test is the user's**:
-`npm start` → Expo Go on a physical iPhone (same Wi-Fi) → Den toggle. The iOS simulator
-stays a no-go for GL (documented in MILESTONES).
+Gates: typecheck ✓ · lint 0 errors ✓ · unit 46/46 ✓ (10 new for the behavior system)
+· iOS export ✓ (GLB bundled). Live, screenshot-proofed in `docs/design/proof/frenchie3d-*.png`:
+embedded 1K PBR textures render (the historically-broken RN path — field-confirmed),
+RoomEnvironment PMREM + ACES + PCF contact shadow, auto-framing, turntable drag, tap-hop
+with squash landing, tail wag oscillating across frames, tongue blep, sad droop + slump,
+and the **ambient scheduler running** — the pup autonomously changes heading/pose across
+the neutral-frame series (`ambient-neutral`), sad chip tucks + lowers him (`ambient-sad`),
+happy chip caught mid-hop (`ambient-happy-hop`). Stable once the Android AVD was given
+4GB (a **low-RAM AVD OOM-killed its own system_server** under sustained software-GL load —
+an emulator limit, not app code; real iPhones use hardware GL). **iOS feel-test is the
+user's**: `npm start` → Expo Go on a physical iPhone (same Wi-Fi). The iOS simulator stays
+a no-go for GL (documented in MILESTONES).
+
+**Known real-device follow-up**: the Den's pup renders continuously (`frameloop` default
+"always") since he's always animating — smooth and correct, but worth a battery/thermal
+pass at M5 (e.g. drop to `frameloop="demand"` during long nap holds). Not tuned now to
+avoid guessing without a device in hand.
