@@ -406,7 +406,16 @@ function LoadingCube() {
   );
 }
 
-export default function RealisticPupStage({ height = 260 }: { height?: number }) {
+export default function RealisticPupStage({
+  height = 260,
+  width,
+  showHint = true,
+}: {
+  height?: number;
+  /** Fixed width (e.g. sitting inside the Den's pulse ring); stretches when omitted. */
+  width?: number;
+  showHint?: boolean;
+}) {
   const trigger = useBulldogStore((s) => s.trigger);
   const spin = useRef(HERO_ANGLE);
 
@@ -414,6 +423,10 @@ export default function RealisticPupStage({ height = 260 }: { height?: number })
   // three's JS-thread render loop, so they must not be workletized.
   const gestures = useMemo(() => {
     const pan = Gesture.Pan()
+      // Horizontal-only activation: the Den hero lives in a ScrollView and the
+      // turntable must never capture vertical scroll swipes.
+      .activeOffsetX([-12, 12])
+      .failOffsetY([-14, 14])
       .runOnJS(true)
       // eslint-disable-next-line react-hooks/refs -- gesture-handler onChange fires on touch events, never during render (compiler lint can't see through the RNGH builder)
       .onChange((e) => {
@@ -430,9 +443,11 @@ export default function RealisticPupStage({ height = 260 }: { height?: number })
 
   // The iOS SIMULATOR's GL initializes but never presents a frame (verified
   // 2026-07-12). Real iPhones and Android are fine — say so, don't show a void.
+  const frame = width != null ? { height, width, alignSelf: 'center' as const } : { height };
+
   if (Platform.OS === 'ios' && !Device.isDevice) {
     return (
-      <View style={[styles.wrap, styles.simNote, { height }]}>
+      <View style={[styles.wrap, styles.simNote, frame]}>
         <Text variant="bodyLarge" style={styles.center}>
           🫥 → 🐶
         </Text>
@@ -444,7 +459,7 @@ export default function RealisticPupStage({ height = 260 }: { height?: number })
   }
 
   return (
-    <View style={[styles.wrap, { height }]}>
+    <View style={[styles.wrap, frame]}>
       <Canvas
         style={styles.flex}
         // Explicit PCF: bare `shadows` means PCFSoft, which three 0.185 deprecated
@@ -477,9 +492,11 @@ export default function RealisticPupStage({ height = 260 }: { height?: number })
           style={StyleSheet.absoluteFill}
         />
       </GestureDetector>
-      <Text variant="caption" color="textSecondary" style={styles.hint}>
-        real pup (beta) — spin him around, tap for a bounce 🐾
-      </Text>
+      {showHint ? (
+        <Text variant="caption" color="textSecondary" style={styles.hint}>
+          real pup (beta) — spin him around, tap for a bounce 🐾
+        </Text>
+      ) : null}
     </View>
   );
 }
