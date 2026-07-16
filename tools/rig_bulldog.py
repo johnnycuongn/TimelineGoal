@@ -202,9 +202,11 @@ for key, names in CHAINS.items():
 bpy.ops.object.mode_set(mode="OBJECT")
 log("skeleton warped")
 
-# helper bones must not receive weights
+# helper bones must not receive weights. The EAR chains are disabled too: the
+# shiba's upright-ear bones sit wrong on the bulldog's flat folded ears and the
+# clips' ear-flapping folds them — rigid-with-Head is correct for floppy ears.
 for b in arm.data.bones:
-    if b.name.startswith(("IK", "FF", "PoleTarget")) or b.name.endswith("_end"):
+    if b.name.startswith(("IK", "FF", "PoleTarget", "Ear")) or b.name.endswith("_end"):
         b.use_deform = False
 
 # ---------- skin ----------
@@ -229,6 +231,86 @@ if eyes:
     vg.add(range(len(eyes.data.vertices)), 1.0, "REPLACE")
     log("eyes bound rigidly to Head")
 
+# ---------- weight polish (fixes the v1 skinning artifacts) ----------
+from mathutils.kdtree import KDTree
+
+bpy.ops.object.select_all(action="DESELECT")
+body.select_set(True)
+bpy.context.view_layer.objects.active = body
+
+# smooth + clean + limit — softens pinching folds at the neck/shoulders
+bpy.ops.object.mode_set(mode="WEIGHT_PAINT")
+bpy.ops.object.vertex_group_smooth(group_select_mode="ALL", factor=0.5, repeat=2, expand=0.0)
+bpy.ops.object.vertex_group_clean(group_select_mode="ALL", limit=0.02)
+bpy.ops.object.vertex_group_limit_total(group_select_mode="ALL", limit=4)
+bpy.ops.object.vertex_group_normalize_all(group_select_mode="ALL", lock_active=False)
+bpy.ops.object.mode_set(mode="OBJECT")
+log("weights smoothed/cleaned/limited")
+
+me = body.data
+nverts = len(me.vertices)
+
+def read_weights(i):
+    return {g.group: g.weight for g in me.vertices[i].groups}
+
+def write_weights(i, w):
+    for vg in body.vertex_groups:
+        try:
+            vg.remove([i])
+        except RuntimeError:
+            pass
+    for gi, gw in w.items():
+        if gw > 0.001:
+            body.vertex_groups[gi].add([i], gw, "REPLACE")
+
+# 1) WELD weights across coincident vertices (UV-seam twins). The scan splits
+#    vertices along texture seams; if the twins deform with different weights
+#    the surface physically cracks — average the weights per position-cluster.
+kd = KDTree(nverts)
+for i, v in enumerate(me.vertices):
+    kd.insert(v.co, i)
+kd.balance()
+eps = max(b_size) * 2e-5
+seen = set()
+welded = 0
+for i, v in enumerate(me.vertices):
+    if i in seen:
+        continue
+    cluster = [j for (_, j, dist) in kd.find_range(v.co, eps)]
+    seen.update(cluster)
+    if len(cluster) < 2:
+        continue
+    avg = {}
+    for j in cluster:
+        for gi, gw in read_weights(j).items():
+            avg[gi] = avg.get(gi, 0.0) + gw / len(cluster)
+    for j in cluster:
+        write_weights(j, avg)
+    welded += len(cluster)
+log(f"welded weights across {welded} seam-twin vertices")
+
+# 2) RESCUE under-weighted vertices (the mid-jump stray scraps: near-zero total
+#    weight leaves them frozen at bind pose while the body animates away).
+good = []
+bad = []
+for i in range(nverts):
+    total = sum(read_weights(i).values())
+    (good if total > 0.5 else bad).append(i)
+if bad:
+    kdg = KDTree(len(good))
+    for gi_, i in enumerate(good):
+        kdg.insert(me.vertices[i].co, i)
+    kdg.balance()
+    for i in bad:
+        _, j, _ = kdg.find(me.vertices[i].co)
+        write_weights(i, read_weights(j))
+log(f"rescued {len(bad)} under-weighted vertices")
+
+# final normalize
+bpy.ops.object.mode_set(mode="WEIGHT_PAINT")
+bpy.ops.object.vertex_group_normalize_all(group_select_mode="ALL", lock_active=False)
+bpy.ops.object.mode_set(mode="OBJECT")
+
 # ---------- drop duplicate actions ----------
 for act in list(bpy.data.actions):
     if act.name.startswith("AnimalArmature|"):
@@ -251,15 +333,21 @@ scene = bpy.context.scene
 cam_data = bpy.data.cameras.new("cam")
 cam = bpy.data.objects.new("cam", cam_data)
 scene.collection.objects.link(cam)
-d = max(s_size) * 2.2
-cam.location = s_center + Vector((-s_face.y, s_face.x, 0)) * d + Vector((0, 0, s_size.z * 0.9))
-# point at center
+d = max(s_size) * 2.0
+side_v = Vector((-s_face.y, s_face.x, 0))
+# three-quarter front view at chest height — shows face, ears, legs and seams
+cam.location = s_center + s_face * d * 0.85 + side_v * d * 0.5 + Vector((0, 0, s_size.z * 0.35))
 direction = (s_center - cam.location).normalized()
 cam.rotation_euler = direction.to_track_quat("-Z", "Z").to_euler()
 scene.camera = cam
 sun = bpy.data.objects.new("sun", bpy.data.lights.new("sun", "SUN"))
+sun.data.energy = 3.0
 scene.collection.objects.link(sun)
-sun.rotation_euler = (0.6, 0.2, 0)
+sun.rotation_euler = (0.9, 0.3, 0.8)
+fill = bpy.data.objects.new("fill", bpy.data.lights.new("fill", "SUN"))
+fill.data.energy = 1.2
+scene.collection.objects.link(fill)
+fill.rotation_euler = (1.1, -0.4, -2.2)
 for eng in ("BLENDER_EEVEE_NEXT", "BLENDER_EEVEE", "CYCLES"):
     try:
         scene.render.engine = eng
@@ -284,6 +372,7 @@ def render_action(action_name, frame, out):
 
 render_action(None, 1, "check-bind.png")
 render_action("Walk", 8, "check-walk.png")
-render_action("Gallop", 5, "check-gallop.png")
-render_action("Idle_2_HeadLow", 10, "check-rest.png")
+render_action("Gallop_Jump", 14, "check-jump.png")  # mid-air — stray-scrap check
+render_action("Idle_2_HeadLow", 30, "check-rest.png")  # deep head-down — ear-fold check
+render_action("Eating", 40, "check-eat.png")  # nose to floor — ear + seam check
 log("DONE")
