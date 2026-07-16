@@ -1,6 +1,15 @@
 # 3D pup models — provenance
 
-- **bulldog-puppy.glb** — "Bulldog Puppy" by **doinspire** (realistic stage — Den toggle)
+- **bulldog-rigged.glb** — the CURRENT Den pup: doinspire's bulldog-puppy mesh (below)
+  rigged locally in Blender (`tools/rig_bulldog.py`, 2026-07-16) by transferring the
+  skeleton + all 12 animation clips from the CC0 Quaternius shiba (below). Combined
+  licensing: mesh/textures **CC-BY 4.0 (credit doinspire)** · skeleton/animations
+  **CC0 (Quaternius)** → ship with the doinspire credit line (M5 Us tab).
+  Clips: Idle, Idle_2, Idle_2_HeadLow, Walk, Gallop, Gallop_Jump, Jump_ToIdle,
+  Eating, Attack, Death, Idle_HitReact_Left/Right.
+
+- **bulldog-puppy.glb** — "Bulldog Puppy" by **doinspire** (static original; also the
+  procedural RealisticPupStage fallback)
   - https://sketchfab.com/3d-models/bulldog-puppy-7081c9c27df244bf84774361888f58a2
   - **License: CC Attribution 4.0 (CC-BY 4.0)** — attribution REQUIRED. Credit line:
     “Bulldog Puppy” by doinspire, licensed under CC BY 4.0

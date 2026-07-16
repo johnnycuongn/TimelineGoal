@@ -6,7 +6,7 @@ import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { Button } from '@/components/button';
 import { Screen } from '@/components/screen';
 import { Text } from '@/components/text';
-import RealisticPupStage from '@/features/bulldog/pup3d/RealisticPupStage';
+import RiggedPupStage from '@/features/bulldog/pup3d/RiggedPupStage';
 import { useBulldogStore } from '@/features/bulldog/store';
 import { useAuth } from '@/features/auth/AuthProvider';
 import { useCouple } from '@/features/couple/CoupleProvider';
@@ -116,8 +116,9 @@ export default function DenScreen() {
               colorA={couple.partnerColors[uidA] ?? colors.primary}
               colorB={(uidB && couple.partnerColors[uidB]) || colors.secondary}>
               {/* The realistic 3D pup IS the bulldog now (transparent GL canvas
-                  sits inside the pulse ring; SVG Mochi remains in onboarding). */}
-              <RealisticPupStage width={140} height={140} showHint={false} />
+                  sits inside the pulse ring; SVG Mochi remains in onboarding).
+                  Rigged edition: real skeletal dog animations. */}
+              <RiggedPupStage width={140} height={140} showHint={false} />
             </PulseRing>
           </View>
           <Text variant="title">{bulldogName}’s Den</Text>

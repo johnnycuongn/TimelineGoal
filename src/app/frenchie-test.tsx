@@ -1,7 +1,7 @@
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { Text } from '@/components/text';
-import RealisticPupStage from '@/features/bulldog/pup3d/RealisticPupStage';
+import RiggedPupStage from '@/features/bulldog/pup3d/RiggedPupStage';
 import { useBulldogStore } from '@/features/bulldog/store';
 import { haptics, radius, spacing, useTheme } from '@/theme';
 
@@ -29,7 +29,7 @@ export default function FrenchieTestScreen() {
       <Text variant="title" style={styles.title}>
         realistic pup test rig
       </Text>
-      <RealisticPupStage height={420} />
+      <RiggedPupStage height={420} />
       <View style={styles.row}>
         {chips.map((c) => (
           <Pressable
