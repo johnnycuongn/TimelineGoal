@@ -70,13 +70,16 @@ const GRAVITY = 12;
 const HERO_ANGLE = -0.35;
 const TONGUE_PINK = '#D96A7E';
 
-/** Per-mesh uniforms driving the head-bend + tail-bend shader (updated every frame). */
+/** Per-mesh uniforms driving the head + tail + leg shader (updated every frame). */
 interface DeformSet {
   uHeadYaw: IUniform<number>;
   uHeadPitch: IUniform<number>;
   uHeadRoll: IUniform<number>;
   uWag: IUniform<number>;
   uDroop: IUniform<number>;
+  /** Per-leg swing (fore/aft) and ankle-lift, indexed [FL, FR, BL, BR] by (front/back, side). */
+  swing: IUniform<number>[];
+  lift: IUniform<number>[];
 }
 
 /** A tiny under-damped spring — snap toward target with a hint of overshoot, then settle. */
@@ -121,25 +124,48 @@ interface TailParams {
   side: Vector3;
   r: number;
 }
+interface LegParams {
+  bodyC: Vector3; // body center (object space) — classifies which leg a vertex is
+  hipPt: Vector3; // a point at hip height — measures how far below the hip a vertex is
+  legLen: number; // hip → paw
+  hips: [Vector3, Vector3, Vector3, Vector3]; // per-leg pivot, [FL, FR, BL, BR]
+}
 
 /**
- * Inject head + tail articulation into a standard material's vertex shader.
- * HEAD: vertices forward-of and at/above the neck rotate around the neck pivot
- * (yaw/pitch/roll), weighted by forward distance × height so the nose swings most
- * and jowls/ears lag; the front paws (forward but LOW) are gated out by the height
- * term. TAIL: rear-tip vertices bend for wag/droop. All in the mesh's object space
- * (the caller passes pre-transformed axes) so it stays model-agnostic.
+ * Inject head + tail + leg articulation into a standard material's vertex shader.
+ *  HEAD: vertices forward-of and at/above the neck rotate around the neck pivot
+ *    (yaw/pitch/roll), weighted by forward distance × height so the nose swings
+ *    most and jowls/ears lag; front paws (forward but LOW) are gated out by height.
+ *  TAIL: rear-tip vertices bend for wag/droop.
+ *  LEGS: vertices BELOW the hip line are classified into four quadrants (front/back
+ *    × side) and each swings fore/aft around its own hip pivot, more at the paw
+ *    (a knee-ish bend), with an extra ankle flex near the bottom. Leg axes reuse
+ *    the head's up/side/face (same mesh). All in the mesh's object space.
  */
-function patchDeform(mat: MeshStandardMaterial, head: HeadParams, tail: TailParams): DeformSet {
+function patchDeform(
+  mat: MeshStandardMaterial,
+  head: HeadParams,
+  tail: TailParams,
+  legs: LegParams,
+): DeformSet {
+  const swing = [{ value: 0 }, { value: 0 }, { value: 0 }, { value: 0 }];
+  const lift = [{ value: 0 }, { value: 0 }, { value: 0 }, { value: 0 }];
   const set: DeformSet = {
     uHeadYaw: { value: 0 },
     uHeadPitch: { value: 0 },
     uHeadRoll: { value: 0 },
     uWag: { value: 0 },
     uDroop: { value: 0 },
+    swing,
+    lift,
   };
   mat.onBeforeCompile = (shader) => {
-    Object.assign(shader.uniforms, set, {
+    Object.assign(shader.uniforms, {
+      uHeadYaw: set.uHeadYaw,
+      uHeadPitch: set.uHeadPitch,
+      uHeadRoll: set.uHeadRoll,
+      uWag: set.uWag,
+      uDroop: set.uDroop,
       uNeck: { value: head.neck },
       uHFace: { value: head.face },
       uHUp: { value: head.up },
@@ -150,6 +176,21 @@ function patchDeform(mat: MeshStandardMaterial, head: HeadParams, tail: TailPara
       uTUp: { value: tail.up },
       uTSide: { value: tail.side },
       uTailR: { value: tail.r },
+      uBodyC: { value: legs.bodyC },
+      uHipPt: { value: legs.hipPt },
+      uLegLen: { value: legs.legLen },
+      uHip0: { value: legs.hips[0] },
+      uHip1: { value: legs.hips[1] },
+      uHip2: { value: legs.hips[2] },
+      uHip3: { value: legs.hips[3] },
+      uSwing0: swing[0],
+      uSwing1: swing[1],
+      uSwing2: swing[2],
+      uSwing3: swing[3],
+      uLift0: lift[0],
+      uLift1: lift[1],
+      uLift2: lift[2],
+      uLift3: lift[3],
     });
     shader.vertexShader = shader.vertexShader
       .replace(
@@ -159,6 +200,10 @@ function patchDeform(mat: MeshStandardMaterial, head: HeadParams, tail: TailPara
           'uniform vec3 uNeck; uniform vec3 uHFace; uniform vec3 uHUp; uniform vec3 uHSide;',
           'uniform float uWag; uniform float uDroop; uniform float uTailR;',
           'uniform vec3 uTip; uniform vec3 uTRear; uniform vec3 uTUp; uniform vec3 uTSide;',
+          'uniform vec3 uBodyC; uniform vec3 uHipPt; uniform float uLegLen;',
+          'uniform vec3 uHip0; uniform vec3 uHip1; uniform vec3 uHip2; uniform vec3 uHip3;',
+          'uniform float uSwing0; uniform float uSwing1; uniform float uSwing2; uniform float uSwing3;',
+          'uniform float uLift0; uniform float uLift1; uniform float uLift2; uniform float uLift3;',
           'vec3 rotAxis(vec3 p, vec3 ax, float a){ return p*cos(a) + cross(ax,p)*sin(a) + ax*dot(ax,p)*(1.0-cos(a)); }',
           '#include <common>',
         ].join('\n'),
@@ -177,6 +222,20 @@ function patchDeform(mat: MeshStandardMaterial, head: HeadParams, tail: TailPara
           '    p = rotAxis(p, uHSide, uHeadPitch*wH);',
           '    p = rotAxis(p, uHFace, uHeadRoll*wH);',
           '    transformed = uNeck + p;',
+          '  }',
+          // legs: below the hip line only
+          '  float below = dot(uHipPt - transformed, uHUp);',
+          '  float low = smoothstep(0.0, uLegLen, below);',
+          '  if (low > 0.001) {',
+          '    float fS = dot(transformed - uBodyC, uHFace);',
+          '    float sS = dot(transformed - uBodyC, uHSide);',
+          '    vec3 hip; float sw; float lf;',
+          '    if (fS > 0.0) { if (sS > 0.0) { hip=uHip0; sw=uSwing0; lf=uLift0; } else { hip=uHip1; sw=uSwing1; lf=uLift1; } }',
+          '    else { if (sS > 0.0) { hip=uHip2; sw=uSwing2; lf=uLift2; } else { hip=uHip3; sw=uSwing3; lf=uLift3; } }',
+          '    vec3 p = transformed - hip;',
+          '    p = rotAxis(p, uHSide, sw * (0.35 + 0.65*low));', // swing, knee-ish
+          '    p = rotAxis(p, uHSide, lf * smoothstep(0.6, 1.0, low));', // ankle/paw flex
+          '    transformed = hip + p;',
           '  }',
           '  float wT = 1.0 - smoothstep(0.0, uTailR, distance(transformed, uTip));',
           '  if (wT > 0.001) {',
@@ -283,7 +342,9 @@ function PuppyModel({ spin, roam }: { spin: MutableRefObject<number>; roam: numb
     const up = new Vector3(0, 1, 0);
     const side = new Vector3().crossVectors(up, face).normalize();
 
-    // World-space extremes: tail tip (rear-most, upper) and nose (front-most, mid).
+    // World-space extremes: tail tip (rear-most, upper) and nose (front-most, mid);
+    // and bin the lower-body vertices into the four legs (front/back × side) to
+    // find each leg's hip pivot.
     const v = new Vector3();
     const tailTip = new Vector3();
     const nose = new Vector3();
@@ -291,6 +352,9 @@ function PuppyModel({ spin, roam }: { spin: MutableRefObject<number>; roam: numb
     let bestNose = -Infinity;
     const yLo = box.min.y;
     const h = size.y;
+    const hipY = yLo + 0.42 * h;
+    const legSum = [new Vector3(), new Vector3(), new Vector3(), new Vector3()];
+    const legN = [0, 0, 0, 0];
     for (const m of meshes) {
       const pos = m.geometry.getAttribute('position');
       for (let i = 0; i < pos.count; i++) {
@@ -304,6 +368,15 @@ function PuppyModel({ spin, roam }: { spin: MutableRefObject<number>; roam: numb
           bestNose = v.dot(face);
           nose.copy(v);
         }
+        if (yFrac < 0.4) {
+          const fS =
+            (v.x - center.x) * face.x + (v.y - center.y) * face.y + (v.z - center.z) * face.z;
+          const sS =
+            (v.x - center.x) * side.x + (v.y - center.y) * side.y + (v.z - center.z) * side.z;
+          const q = (fS > 0 ? 0 : 2) + (sS > 0 ? 0 : 1);
+          legSum[q].add(v);
+          legN[q]++;
+        }
       }
     }
 
@@ -315,6 +388,23 @@ function PuppyModel({ spin, roam }: { spin: MutableRefObject<number>; roam: numb
       .addScaledVector(up, h * 0.06);
     const headR = Math.max(noseFwd * 0.62, maxDim * 0.2);
     const tailR = maxDim * 0.17;
+
+    // Each leg's hip pivot: the bin's horizontal centroid, raised to the hip line.
+    // Fallback for an empty bin: a sensible offset from center.
+    const legOff = maxDim * 0.14;
+    const hipsWorld: [Vector3, Vector3, Vector3, Vector3] = [0, 1, 2, 3].map((q) => {
+      const p =
+        legN[q] > 0
+          ? legSum[q].clone().multiplyScalar(1 / legN[q])
+          : center
+              .clone()
+              .addScaledVector(face, (q < 2 ? 1 : -1) * legOff)
+              .addScaledVector(side, (q % 2 === 0 ? 1 : -1) * legOff);
+      p.y = hipY;
+      return p;
+    }) as [Vector3, Vector3, Vector3, Vector3];
+    const legLen = hipY - yLo;
+    const hipPtWorld = new Vector3(center.x, hipY, center.z);
 
     // Wire the shader into EVERY mesh (head bend needs the eyes too), each in that
     // mesh's own object space.
@@ -340,6 +430,17 @@ function PuppyModel({ spin, roam }: { spin: MutableRefObject<number>; roam: numb
           up: up.clone().transformDirection(inv),
           side: side.clone().transformDirection(inv),
           r: tailR * sc,
+        },
+        {
+          bodyC: center.clone().applyMatrix4(inv),
+          hipPt: hipPtWorld.clone().applyMatrix4(inv),
+          legLen: legLen * sc,
+          hips: [
+            hipsWorld[0].clone().applyMatrix4(inv),
+            hipsWorld[1].clone().applyMatrix4(inv),
+            hipsWorld[2].clone().applyMatrix4(inv),
+            hipsWorld[3].clone().applyMatrix4(inv),
+          ],
         },
       );
     });
@@ -511,13 +612,37 @@ function PuppyModel({ spin, roam }: { spin: MutableRefObject<number>; roam: numb
     const headYaw = hYaw.current.x + fid.yaw * 0.03 + shake;
     const headPitch = hPitch.current.x + fid.pitch * 0.022 + walkNod;
     const headRoll = hRoll.current.x + fid.roll * 0.02;
+
+    // Legs: a diagonal-pair trot while walking (bob is the walk signal), plus a
+    // gentle weight-shift and ankle flex at rest so the paws are never rigid.
+    // Index [FL, FR, BL, BR] = (front/back, side); diagonal pairs {FL,BR}+{FR,BL}.
+    const gait = reduceMotion ? 0 : Math.min(OC.bob / 0.028, 1);
+    const gp = t * 6.5;
+    const swA = gait * 0.15;
+    const lfA = gait * 0.13;
+    const a = Math.sin(gp); // FL & BR
+    const b = Math.sin(gp + Math.PI); // FR & BL
+    const wsh = reduceMotion ? 0 : (1 - gait) * fid.sway * 0.02; // lean weight side to side
+    const al = reduceMotion ? 0 : (1 - gait) * Math.sin(t * 1.1) * 0.008; // idle ankle life
+    const swing = [a * swA + wsh, b * swA - wsh, b * swA + wsh, a * swA - wsh];
+    const lift = [
+      Math.max(0, a) * lfA + al,
+      Math.max(0, b) * lfA + al,
+      Math.max(0, b) * lfA + al,
+      Math.max(0, a) * lfA + al,
+    ];
+
+    const wag = reduceMotion ? 0 : Math.sin(t * OC.wagSpeed) * OC.wagAmp;
     for (const u of deform.current) {
       u.uHeadYaw.value = headYaw;
       u.uHeadPitch.value = headPitch;
       u.uHeadRoll.value = headRoll;
-      const wag = reduceMotion ? 0 : Math.sin(t * OC.wagSpeed) * OC.wagAmp;
       u.uWag.value = wag;
       u.uDroop.value = -OC.droop * 0.55;
+      for (let i = 0; i < 4; i++) {
+        u.swing[i].value = swing[i];
+        u.lift[i].value = lift[i];
+      }
     }
 
     // Tongue tracks the moving muzzle: rotate the mouth anchor by the head angles.
