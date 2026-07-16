@@ -2,6 +2,7 @@ import {
   BEHAVIORS,
   behaviorDuration,
   clampToStage,
+  idleFidget,
   neutralOsc,
   neutralTarget,
   nextGap,
@@ -9,6 +10,7 @@ import {
   resetOsc,
   resetTarget,
   STAGE,
+  TRANSITIONS,
   type Pool,
 } from './pupBehaviors';
 
@@ -80,6 +82,44 @@ describe('nextGap', () => {
       expect(nextGap(pool, () => 0)).toBeGreaterThan(0);
       expect(nextGap(pool, () => 1)).toBeLessThanOrEqual(4);
     }
+  });
+});
+
+describe('idleFidget', () => {
+  it('is always finite and small (micro-motion, never a lurch)', () => {
+    for (let t = 0; t < 40; t += 0.37) {
+      const f = idleFidget(t);
+      for (const v of [f.yaw, f.pitch, f.roll, f.sway]) {
+        expect(Number.isFinite(v)).toBe(true);
+        expect(Math.abs(v)).toBeLessThanOrEqual(1.2);
+      }
+    }
+  });
+  it('actually varies over time (he is never frozen)', () => {
+    expect(idleFidget(0).yaw).not.toBeCloseTo(idleFidget(3).yaw);
+  });
+});
+
+describe('TRANSITIONS (behavior chaining)', () => {
+  it('only references real neutral behaviors', () => {
+    for (const [from, tos] of Object.entries(TRANSITIONS)) {
+      expect(BEHAVIORS[from]).toBeDefined();
+      for (const to of tos) {
+        expect(BEHAVIORS[to]).toBeDefined();
+        expect(BEHAVIORS[to].pool).toBe('neutral');
+      }
+    }
+  });
+  it('a preferred follow-up is more likely than its base weight', () => {
+    // Count picks with vs without a prefer boost across the RNG range.
+    const sample = (prefer?: string[]) => {
+      let hits = 0;
+      for (let i = 0; i < 1000; i++) {
+        if (pickBehavior('neutral', () => i / 1000, prefer) === 'walk') hits++;
+      }
+      return hits;
+    };
+    expect(sample(['walk'])).toBeGreaterThan(sample());
   });
 });
 

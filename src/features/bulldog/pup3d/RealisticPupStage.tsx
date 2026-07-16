@@ -11,26 +11,22 @@
  * a STATIC photoscan-grade mesh (no rig, no morphs), so ALL life is procedural,
  * self-calibrated from the mesh at mount (nothing hand-tuned to this GLB).
  *
- * A rig-less scan can't leg-walk, so "alive" is whole-body: a per-frame loop damps
- * the mesh toward posture TARGETS (yaw/pitch/roll/x/z/sink/mouth) and layers
- * OSCILLATORS (breath, step-bob, tail wag, shake) on top. What those targets are
- * is decided by pupBehaviors.ts — an ethogram + weighted scheduler:
+ * NATURALNESS — what keeps a rig-less mesh from reading like a shoved-around toy:
+ *  1. The HEAD articulates independently of the body. A vertex shader bends the
+ *     head region (found at calibration) around the neck; jowls and ears lag the
+ *     nose via distance falloff. Deliberate looks/tilts/sniffs are HEAD moves; the
+ *     body only turns to walk or reorient. This is the big one — dogs lead with
+ *     the head.
+ *  2. He is NEVER perfectly still: `idleFidget` is an always-on micro layer
+ *     (head sway, weight-shift, breathing) so he breathes and shifts between
+ *     actions instead of freezing at a pose.
+ *  3. The head is SPRING-driven — a look snaps then settles with a hint of
+ *     overshoot, never a uniform linear pan. Fast texture (head-shake, walk-nod)
+ *     is layered additively so the spring doesn't smear it.
  *
- *   neutral (idle) — the pup LIVES here: autonomously looks around, tilts his head
- *     (wondering), gazes up, sniffs the floor, trots to a new spot, turns around,
- *     shakes off, pants, play-bows, sits, wag-bursts, barks — with relaxed pauses
- *     between. Occasionally a full nap: yawn → lie down → sleep (deep breath +
- *     dream-twitch) → wake + stretch.
- *   sad   ('pout')   — sighs, looks away, lies down glumly; tail tucked.
- *   sleepy           — drops straight into the nap cycle (boop to wake).
- *   happy/party/love/proud — scripted here: hop(s) + fast wag + tongue + shimmy,
- *     party adds a joy-spin. (Happy EYES need morph targets a scan lacks — that
- *     lands with the rigged-model upgrade path; see the design doc.)
- *
- * Everything is damped, so a real check-in interrupts a yawn and eases over.
- * Reduce Motion → the scheduler is off and the pup holds still (motion-spec).
- * Horizontal drag spins the turntable; tap bounces him. The GL canvas eats
- * touches, so gestures live on a transparent overlay ABOVE it.
+ * WHAT he does is decided by pupBehaviors.ts (ethogram + weighted scheduler with
+ * light chaining). Reduce Motion → scheduler + fidget off, he holds still.
+ * Horizontal drag spins the turntable; tap bounces him.
  */
 /* eslint-disable react/no-unknown-property -- react-three-fiber JSX sets three.js object properties */
 
@@ -41,15 +37,7 @@ import { Suspense, useEffect, useMemo, useRef, type MutableRefObject } from 'rea
 import { LogBox, Platform, StyleSheet, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { useReducedMotion } from 'react-native-reanimated';
-import {
-  Box3,
-  MathUtils,
-  Matrix4,
-  PCFShadowMap,
-  PMREMGenerator,
-  Quaternion,
-  Vector3,
-} from 'three';
+import { Box3, MathUtils, Matrix4, PCFShadowMap, PMREMGenerator, Quaternion, Vector3 } from 'three';
 import type { Group, IUniform, Mesh, MeshStandardMaterial } from 'three';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 
@@ -59,12 +47,14 @@ import { useBulldogStore } from '../store';
 import {
   behaviorDuration,
   BEHAVIORS,
+  idleFidget,
   neutralOsc,
   neutralTarget,
   nextGap,
   pickBehavior,
   resetOsc,
   resetTarget,
+  TRANSITIONS,
   type Pool,
   type PupOsc,
   type PupTarget,
@@ -75,22 +65,31 @@ import {
 LogBox.ignoreLogs(['THREE.Clock: This module has been deprecated.']);
 
 const FLOOR_Y = -1.05;
-const HOP_VELOCITY = 3.2; // world u/s → apex ≈ 0.43u, a cute ~30%-of-body hop
+const HOP_VELOCITY = 3.2;
 const GRAVITY = 12;
-const HERO_ANGLE = -0.35; // initial turntable angle, slightly toward the camera
-const TONGUE_PINK = '#D96A7E'; // art constant — puppy tongue
+const HERO_ANGLE = -0.35;
+const TONGUE_PINK = '#D96A7E';
 
-/** Per-mesh uniforms driving the tail-bend shader (updated every frame). */
-interface WagSet {
+/** Per-mesh uniforms driving the head-bend + tail-bend shader (updated every frame). */
+interface DeformSet {
+  uHeadYaw: IUniform<number>;
+  uHeadPitch: IUniform<number>;
+  uHeadRoll: IUniform<number>;
   uWag: IUniform<number>;
   uDroop: IUniform<number>;
 }
 
-/**
- * Offline image-based lighting: bake three's built-in RoomEnvironment (a lit
- * studio box — zero assets, zero network) into a PMREM env map. This is what
- * makes PBR materials read as "real" instead of flat-lit.
- */
+/** A tiny under-damped spring — snap toward target with a hint of overshoot, then settle. */
+interface Spring {
+  x: number;
+  v: number;
+}
+function springTo(s: Spring, target: number, k: number, c: number, dt: number): void {
+  const a = -k * (s.x - target) - c * s.v;
+  s.v += a * dt;
+  s.x += s.v * dt;
+}
+
 function StudioLighting() {
   const gl = useThree((s) => s.gl);
   const scene = useThree((s) => s.scene);
@@ -98,7 +97,7 @@ function StudioLighting() {
     const pmrem = new PMREMGenerator(gl);
     const rt = pmrem.fromScene(new RoomEnvironment(), 0.04);
     scene.environment = rt.texture;
-    scene.environmentIntensity = 0.9; // key light adds the warmth on top
+    scene.environmentIntensity = 0.9;
     return () => {
       scene.environment = null;
       rt.dispose();
@@ -108,31 +107,59 @@ function StudioLighting() {
   return null;
 }
 
+interface HeadParams {
+  neck: Vector3;
+  face: Vector3;
+  up: Vector3;
+  side: Vector3;
+  r: number;
+}
+interface TailParams {
+  tip: Vector3;
+  rear: Vector3;
+  up: Vector3;
+  side: Vector3;
+  r: number;
+}
+
 /**
- * Inject a localized bend into a standard material's vertex shader: vertices
- * within radius uR of the tail tip rotate around the tail root — yaw = wag,
- * pitch = droop — with smooth falloff. All in the MESH's object space; the
- * caller passes pre-transformed axes so this stays model-agnostic.
+ * Inject head + tail articulation into a standard material's vertex shader.
+ * HEAD: vertices forward-of and at/above the neck rotate around the neck pivot
+ * (yaw/pitch/roll), weighted by forward distance × height so the nose swings most
+ * and jowls/ears lag; the front paws (forward but LOW) are gated out by the height
+ * term. TAIL: rear-tip vertices bend for wag/droop. All in the mesh's object space
+ * (the caller passes pre-transformed axes) so it stays model-agnostic.
  */
-function patchTailWag(
-  mat: MeshStandardMaterial,
-  local: { tip: Vector3; rear: Vector3; up: Vector3; side: Vector3; r: number },
-): WagSet {
-  const set: WagSet = { uWag: { value: 0 }, uDroop: { value: 0 } };
+function patchDeform(mat: MeshStandardMaterial, head: HeadParams, tail: TailParams): DeformSet {
+  const set: DeformSet = {
+    uHeadYaw: { value: 0 },
+    uHeadPitch: { value: 0 },
+    uHeadRoll: { value: 0 },
+    uWag: { value: 0 },
+    uDroop: { value: 0 },
+  };
   mat.onBeforeCompile = (shader) => {
-    shader.uniforms.uWag = set.uWag;
-    shader.uniforms.uDroop = set.uDroop;
-    shader.uniforms.uTip = { value: local.tip };
-    shader.uniforms.uRear = { value: local.rear };
-    shader.uniforms.uUp = { value: local.up };
-    shader.uniforms.uSide = { value: local.side };
-    shader.uniforms.uR = { value: local.r };
+    Object.assign(shader.uniforms, set, {
+      uNeck: { value: head.neck },
+      uHFace: { value: head.face },
+      uHUp: { value: head.up },
+      uHSide: { value: head.side },
+      uHeadR: { value: head.r },
+      uTip: { value: tail.tip },
+      uTRear: { value: tail.rear },
+      uTUp: { value: tail.up },
+      uTSide: { value: tail.side },
+      uTailR: { value: tail.r },
+    });
     shader.vertexShader = shader.vertexShader
       .replace(
         '#include <common>',
         [
-          'uniform float uWag; uniform float uDroop; uniform float uR;',
-          'uniform vec3 uTip; uniform vec3 uRear; uniform vec3 uUp; uniform vec3 uSide;',
+          'uniform float uHeadYaw; uniform float uHeadPitch; uniform float uHeadRoll; uniform float uHeadR;',
+          'uniform vec3 uNeck; uniform vec3 uHFace; uniform vec3 uHUp; uniform vec3 uHSide;',
+          'uniform float uWag; uniform float uDroop; uniform float uTailR;',
+          'uniform vec3 uTip; uniform vec3 uTRear; uniform vec3 uTUp; uniform vec3 uTSide;',
+          'vec3 rotAxis(vec3 p, vec3 ax, float a){ return p*cos(a) + cross(ax,p)*sin(a) + ax*dot(ax,p)*(1.0-cos(a)); }',
           '#include <common>',
         ].join('\n'),
       )
@@ -141,14 +168,22 @@ function patchTailWag(
         [
           '#include <begin_vertex>',
           '{',
-          '  float w = 1.0 - smoothstep(0.0, uR, distance(transformed, uTip));',
-          '  if (w > 0.001) {',
-          '    vec3 root = uTip - uRear * uR;',
+          '  float hf = dot(transformed - uNeck, uHFace);',
+          '  float hu = dot(transformed - uNeck, uHUp);',
+          '  float wH = smoothstep(0.0, uHeadR, hf) * smoothstep(-0.18*uHeadR, 0.06*uHeadR, hu);',
+          '  if (wH > 0.001) {',
+          '    vec3 p = transformed - uNeck;',
+          '    p = rotAxis(p, uHUp, uHeadYaw*wH);',
+          '    p = rotAxis(p, uHSide, uHeadPitch*wH);',
+          '    p = rotAxis(p, uHFace, uHeadRoll*wH);',
+          '    transformed = uNeck + p;',
+          '  }',
+          '  float wT = 1.0 - smoothstep(0.0, uTailR, distance(transformed, uTip));',
+          '  if (wT > 0.001) {',
+          '    vec3 root = uTip - uTRear * uTailR;',
           '    vec3 p = transformed - root;',
-          '    float a = uWag * w;',
-          '    p = p * cos(a) + cross(uUp, p) * sin(a) + uUp * dot(uUp, p) * (1.0 - cos(a));',
-          '    float b = uDroop * w;',
-          '    p = p * cos(b) + cross(uSide, p) * sin(b) + uSide * dot(uSide, p) * (1.0 - cos(b));',
+          '    p = rotAxis(p, uTUp, uWag*wT);',
+          '    p = rotAxis(p, uTSide, uDroop*wT);',
           '    transformed = root + p;',
           '  }',
           '}',
@@ -163,8 +198,6 @@ function PuppyModel({ spin, roam }: { spin: MutableRefObject<number>; roam: numb
   const reduceMotion = useReducedMotion();
   const outer = useRef<Group>(null);
   const tongue = useRef<Mesh>(null);
-  // No Draco / no meshopt (no Workers/WASM in RN) — plain GLB only, and skipping
-  // the decoders keeps drei from wiring its CDN-pathed loaders at all.
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const gltf = useGLTF(require('../../../../assets/models/bulldog-puppy.glb'), false, false) as unknown as {
     scene: Group;
@@ -173,51 +206,48 @@ function PuppyModel({ spin, roam }: { spin: MutableRefObject<number>; roam: numb
   const nonce = useBulldogStore((s) => s.nonce);
   const setIdle = useBulldogStore((s) => s.setIdle);
 
-  // Framing + motion state live in refs — the render loop mutates them directly.
   const fit = useRef({ s: 1, halfToFeet: 0, ready: false });
   const hop = useRef({ y: 0, vy: 0, queued: 0 });
   const squash = useRef(0);
-  const joySpin = useRef(0); // one-shot celebratory twirl (party), decays to 0
-  const spinCur = useRef(HERO_ANGLE); // damped turntable angle (follows drag)
-  const wagSets = useRef<WagSet[]>([]);
+  const joySpin = useRef(0);
+  const spinCur = useRef(HERO_ANGLE);
+  const deform = useRef<DeformSet[]>([]);
 
-  // Damped posture + oscillators the frame loop applies; scratch objects the
-  // behaviors write into each frame (reused, never re-allocated).
+  // Damped body posture + oscillators; scratch objects the behaviors write into.
   const cur = useRef<PupTarget>(neutralTarget());
   const oscCur = useRef<PupOsc>(neutralOsc());
   const tScratch = useRef<PupTarget>(neutralTarget());
   const oScratch = useRef<PupOsc>(neutralOsc());
+  // The head rides springs (deliberate look = snap + settle), the body rides damps.
+  const hYaw = useRef<Spring>({ x: 0, v: 0 });
+  const hPitch = useRef<Spring>({ x: 0, v: 0 });
+  const hRoll = useRef<Spring>({ x: 0, v: 0 });
 
-  // Ambient behavior scheduler: the currently-running action + the relax gap
-  // before the next one. Randomness lives only in the frame loop / effects
-  // (never in render), so React-Compiler purity holds.
   const behav = useRef<{ name: string; elapsed: number; dur: number; params: Record<string, number> } | null>(
     null,
   );
   const gap = useRef(0.6);
+  const lastName = useRef<string>('standWatch');
 
   const moodRef = useRef(mood);
   useEffect(() => {
     moodRef.current = mood;
   }, [mood]);
 
-  // Mouth anchor + face direction for the tongue, found during calibration.
-  // A ref, not state: the R3F root mounts asynchronously and a setState from
-  // this effect trips React's "update on a component that hasn't mounted yet"
-  // — the frame loop applies these imperatively instead.
-  const snout = useRef<{ mouth: Vector3; face: Vector3; quat: Quaternion } | null>(null);
+  // Tongue anchor + head frame (group space), for keeping the blep on the moving muzzle.
+  const snout = useRef<{
+    mouth: Vector3;
+    neck: Vector3;
+    face: Vector3;
+    up: Vector3;
+    side: Vector3;
+    quat: Quaternion;
+  } | null>(null);
 
-  // AUTO-FRAME + EMOTION CALIBRATION, all from the measured mesh (scan node
-  // scales are never trustworthy, and nothing here is hand-tuned to this GLB):
-  // frame from the Box3; face direction = eyes-center minus body-center; tail
-  // tip = rear-most high vertex; muzzle = front-most mid-height vertex.
+  // AUTO-FRAME + ARTICULATION CALIBRATION, all from the measured mesh.
   useEffect(() => {
     const g = outer.current;
     if (!g) return;
-    // Measure against a clean identity transform: on remounts (fast refresh,
-    // Den toggle) R3F can recycle the group with the previous scale/position
-    // still applied, and Box3/matrixWorld work in WORLD space — measuring
-    // through a stale ~0.04 scale would compound into a gigantic pup.
     g.scale.setScalar(1);
     g.position.set(0, 0, 0);
     g.rotation.set(0, 0, 0);
@@ -230,16 +260,16 @@ function PuppyModel({ spin, roam }: { spin: MutableRefObject<number>; roam: numb
     if (!isFinite(maxDim) || maxDim <= 0) return;
     const s = 2.0 / maxDim;
 
-    // Sort meshes: eyes tell us which end is the face.
-    const bodies: Mesh[] = [];
+    // Eyes tell us which end is the face.
+    const meshes: Mesh[] = [];
     let eyes: Mesh | null = null;
     gltf.scene.traverse((obj) => {
       if (!(obj as Mesh).isMesh) return;
       const m = obj as Mesh;
       m.castShadow = true;
+      meshes.push(m);
       const name = (Array.isArray(m.material) ? m.material[0] : m.material)?.name;
       if (name === 'Eyes') eyes = m;
-      else bodies.push(m);
     });
 
     const face = new Vector3(0, 0, 1);
@@ -253,8 +283,7 @@ function PuppyModel({ spin, roam }: { spin: MutableRefObject<number>; roam: numb
     const up = new Vector3(0, 1, 0);
     const side = new Vector3().crossVectors(up, face).normalize();
 
-    // Hunt world-space extremes on the body meshes: the tail tip is the
-    // rear-most vertex in the top half; the nose the front-most mid-height one.
+    // World-space extremes: tail tip (rear-most, upper) and nose (front-most, mid).
     const v = new Vector3();
     const tailTip = new Vector3();
     const nose = new Vector3();
@@ -262,46 +291,60 @@ function PuppyModel({ spin, roam }: { spin: MutableRefObject<number>; roam: numb
     let bestNose = -Infinity;
     const yLo = box.min.y;
     const h = size.y;
-    for (const m of bodies) {
+    for (const m of meshes) {
       const pos = m.geometry.getAttribute('position');
       for (let i = 0; i < pos.count; i++) {
         v.fromBufferAttribute(pos, i).applyMatrix4(m.matrixWorld);
         const yFrac = (v.y - yLo) / h;
-        const alongRear = v.dot(rear);
-        const alongFace = v.dot(face);
-        if (yFrac > 0.55 && alongRear > bestTail) {
-          bestTail = alongRear;
+        if (yFrac > 0.55 && v.dot(rear) > bestTail) {
+          bestTail = v.dot(rear);
           tailTip.copy(v);
         }
-        if (yFrac > 0.3 && yFrac < 0.62 && alongFace > bestNose) {
-          bestNose = alongFace;
+        if (yFrac > 0.3 && yFrac < 0.62 && v.dot(face) > bestNose) {
+          bestNose = v.dot(face);
           nose.copy(v);
         }
       }
     }
 
-    // Wire the tail-bend shader into each body mesh with the tip/axes expressed
-    // in THAT mesh's object space (meshes can carry different node transforms).
-    const wagRadius = maxDim * 0.17;
+    // Neck pivot: between the body center and the nose, a touch above center.
+    const noseFwd = nose.clone().sub(center).dot(face);
+    const neck = center
+      .clone()
+      .addScaledVector(face, noseFwd * 0.38)
+      .addScaledVector(up, h * 0.06);
+    const headR = Math.max(noseFwd * 0.62, maxDim * 0.2);
+    const tailR = maxDim * 0.17;
+
+    // Wire the shader into EVERY mesh (head bend needs the eyes too), each in that
+    // mesh's own object space.
     const inv = new Matrix4();
-    wagSets.current = bodies.map((m) => {
+    deform.current = meshes.map((m) => {
       const mat = (Array.isArray(m.material) ? m.material[0] : m.material) as MeshStandardMaterial;
-      const own = mat.clone(); // per-mesh clone so uniforms don't cross meshes
+      const own = mat.clone();
       m.material = own;
       inv.copy(m.matrixWorld).invert();
-      const scaleComp = inv.getMaxScaleOnAxis();
-      return patchTailWag(own, {
-        tip: tailTip.clone().applyMatrix4(inv),
-        rear: rear.clone().transformDirection(inv),
-        up: up.clone().transformDirection(inv),
-        side: side.clone().transformDirection(inv),
-        r: wagRadius * scaleComp,
-      });
+      const sc = inv.getMaxScaleOnAxis();
+      return patchDeform(
+        own,
+        {
+          neck: neck.clone().applyMatrix4(inv),
+          face: face.clone().transformDirection(inv),
+          up: up.clone().transformDirection(inv),
+          side: side.clone().transformDirection(inv),
+          r: headR * sc,
+        },
+        {
+          tip: tailTip.clone().applyMatrix4(inv),
+          rear: rear.clone().transformDirection(inv),
+          up: up.clone().transformDirection(inv),
+          side: side.clone().transformDirection(inv),
+          r: tailR * sc,
+        },
+      );
     });
 
-    // Tongue anchor: a whisker below the nose tip, tucked slightly inward; the
-    // blep slides out along `face`. Coordinates are group-space, so subtract the
-    // same centering offset the scene itself gets below.
+    // Tongue lives in group space (scene is re-centered by −center below).
     const mouth = nose
       .clone()
       .addScaledVector(up, -0.035 * h)
@@ -310,22 +353,22 @@ function PuppyModel({ spin, roam }: { spin: MutableRefObject<number>; roam: numb
     const tilt = face.clone().addScaledVector(up, -0.35).normalize();
     snout.current = {
       mouth,
-      face,
+      neck: neck.clone().sub(center),
+      face: face.clone(),
+      up: up.clone(),
+      side: side.clone(),
       quat: new Quaternion().setFromUnitVectors(new Vector3(0, 0, 1), tilt),
     };
 
     gltf.scene.position.set(-center.x, -center.y, -center.z);
-    g.rotation.y = spin.current; // the frame loop owns rotation from here on
+    g.rotation.y = spin.current;
     fit.current = { s, halfToFeet: (center.y - box.min.y) * s, ready: true };
   }, [gltf.scene, spin]);
 
-  // Transient moods → scripted one-shots (no rig, so whole-body physics): happy
-  // hops once, party twice + a joy-spin, proud does a chest-pop hop-lite, love
-  // wiggles (handled continuously in the frame loop). Timer-based reset so the
-  // NEXT tap/check-in retriggers; on reset the ambient scheduler takes back over.
+  // Transient moods → scripted one-shots that INTERRUPT the ambient action.
   useEffect(() => {
     if (mood !== 'happy' && mood !== 'party' && mood !== 'love' && mood !== 'proud') return;
-    behav.current = null; // a real feeling interrupts whatever he was ambiently doing
+    behav.current = null;
     if (!reduceMotion) {
       if (mood === 'happy') {
         hop.current.vy = HOP_VELOCITY;
@@ -333,7 +376,7 @@ function PuppyModel({ spin, roam }: { spin: MutableRefObject<number>; roam: numb
       } else if (mood === 'party') {
         hop.current.vy = HOP_VELOCITY * 1.15;
         hop.current.queued = 2;
-        joySpin.current = Math.PI * 2; // a full celebratory twirl
+        joySpin.current = Math.PI * 2;
       } else if (mood === 'proud') {
         hop.current.vy = HOP_VELOCITY * 0.6;
       }
@@ -347,11 +390,9 @@ function PuppyModel({ spin, roam }: { spin: MutableRefObject<number>; roam: numb
     if (!g || !fit.current.ready) return;
     const { s, halfToFeet } = fit.current;
     const t = state.clock.elapsedTime;
-    const d = Math.min(dt, 0.05); // clamp long frames so physics never explodes
+    const d = Math.min(dt, 0.04);
     const m = moodRef.current;
 
-    // Desired posture + oscillators for THIS frame — start from neutral, then
-    // let the active mood / behavior write into them.
     const T = tScratch.current;
     const O = oScratch.current;
     resetTarget(T);
@@ -359,23 +400,24 @@ function PuppyModel({ spin, roam }: { spin: MutableRefObject<number>; roam: numb
 
     const happyNow = m === 'happy' || m === 'party' || m === 'love' || m === 'proud';
     if (happyNow && !reduceMotion) {
-      // Scripted joy: fast wag + lolling tongue; love adds a side wiggle.
       O.wagAmp = 0.5;
       O.wagSpeed = 22;
       T.mouth = 1;
+      T.headPitch = 6 * Math.PI / 180; // ears-up, excited
       if (m === 'love') T.roll = Math.sin(t * 10) * 0.12;
     } else if (!reduceMotion) {
-      // Ambient life: pick a pool from the mood and let the scheduler run it.
+      // Ambient scheduler with light chaining.
       const pool: Pool = m === 'pout' ? 'sad' : m === 'sleepy' ? 'nap' : 'neutral';
       let b = behav.current;
       if (b && BEHAVIORS[b.name].pool !== pool) {
-        b = behav.current = null; // mood changed under us — drop the stale action
+        b = behav.current = null;
         gap.current = 0;
       }
       if (!b) {
-        gap.current -= d; // relax at neutral between actions
+        gap.current -= d;
         if (gap.current <= 0) {
-          const name = pickBehavior(pool, Math.random);
+          const name = pickBehavior(pool, Math.random, TRANSITIONS[lastName.current]);
+          lastName.current = name;
           behav.current = {
             name,
             elapsed: 0,
@@ -395,15 +437,19 @@ function PuppyModel({ spin, roam }: { spin: MutableRefObject<number>; roam: numb
       }
     }
 
-    // Damp the live posture toward the desired one — this is what keeps every
-    // transition springy and lets a mood cut in mid-action without snapping.
+    // ---- head springs (deliberate) ----
+    springTo(hYaw.current, T.headYaw, 140, 17, d);
+    springTo(hPitch.current, T.headPitch, 150, 18, d);
+    springTo(hRoll.current, T.headRoll, 120, 16, d);
+
+    // ---- body damps (heavier, no overshoot) ----
     const C = cur.current;
     const OC = oscCur.current;
     C.yaw = MathUtils.damp(C.yaw, T.yaw, 4, d);
     C.pitch = MathUtils.damp(C.pitch, T.pitch, 5, d);
     C.roll = MathUtils.damp(C.roll, T.roll, 5, d);
-    C.x = MathUtils.damp(C.x, T.x, 2.4, d);
-    C.z = MathUtils.damp(C.z, T.z, 2.4, d);
+    C.x = MathUtils.damp(C.x, T.x, 2.2, d);
+    C.z = MathUtils.damp(C.z, T.z, 2.2, d);
     C.sink = MathUtils.damp(C.sink, T.sink, 3, d);
     C.mouth = MathUtils.damp(C.mouth, T.mouth, 9, d);
     OC.wagAmp = MathUtils.damp(OC.wagAmp, O.wagAmp, 7, d);
@@ -412,11 +458,12 @@ function PuppyModel({ spin, roam }: { spin: MutableRefObject<number>; roam: numb
     OC.bob = MathUtils.damp(OC.bob, O.bob, 7, d);
     OC.sway = MathUtils.damp(OC.sway, O.sway, 7, d);
     OC.wobble = MathUtils.damp(OC.wobble, O.wobble, 10, d);
+    OC.headShake = MathUtils.damp(OC.headShake, O.headShake, 12, d);
     OC.breath = MathUtils.damp(OC.breath, O.breath, 3, d);
     OC.breathRate = MathUtils.damp(OC.breathRate, O.breathRate, 3, d);
     OC.twitch = O.twitch;
 
-    // Hop ballistics; landings charge the squash and chain queued hops.
+    // Hop ballistics.
     if (hop.current.vy !== 0 || hop.current.y > 0) {
       hop.current.vy -= GRAVITY * d;
       hop.current.y += hop.current.vy * d;
@@ -433,17 +480,23 @@ function PuppyModel({ spin, roam }: { spin: MutableRefObject<number>; roam: numb
     squash.current = MathUtils.damp(squash.current, 0, 9, d);
     joySpin.current = MathUtils.damp(joySpin.current, 0, 3, d);
 
-    // ---- compose the final transform ----
-    const breath = reduceMotion ? 0 : Math.sin(t * 1.7 * OC.breathRate) * 0.007 * OC.breath;
+    // ---- always-on micro-life (the thing that stops him freezing) ----
+    const fid = reduceMotion ? { yaw: 0, pitch: 0, roll: 0, sway: 0 } : idleFidget(t);
+    const walkNod = reduceMotion ? 0 : Math.sin(t * 8) * OC.bob * 2.2; // head dips per step
+    const shake = reduceMotion ? 0 : Math.sin(t * 42) * OC.headShake;
+    const breathPhase = reduceMotion ? 0 : Math.sin(t * 1.7 * OC.breathRate);
+
+    // ---- compose ----
+    const breath = breathPhase * 0.008 * OC.breath;
     const my = 1 + breath - C.sink * 0.12 - squash.current;
     const grow = 1 + squash.current * 0.5;
     g.scale.set(s * grow, s * my, s * grow);
 
     const groundLift = halfToFeet * my;
-    const bob = reduceMotion ? 0 : Math.sin(t * 8) * OC.bob;
+    const bodyBob = reduceMotion ? 0 : Math.sin(t * 8) * OC.bob + breathPhase * 0.004;
     g.position.set(
       C.x * roam,
-      FLOOR_Y + groundLift + hop.current.y + bob - C.sink * groundLift * 0.55,
+      FLOOR_Y + groundLift + hop.current.y + bodyBob - C.sink * groundLift * 0.55,
       C.z * roam,
     );
 
@@ -452,29 +505,33 @@ function PuppyModel({ spin, roam }: { spin: MutableRefObject<number>; roam: numb
     g.rotation.y = spinCur.current + C.yaw + shimmy + joySpin.current;
     g.rotation.x = C.pitch;
     const jitter = OC.twitch ? (Math.random() - 0.5) * OC.twitch : 0;
-    g.rotation.z = reduceMotion
-      ? 0
-      : C.roll + Math.sin(t * 8) * OC.sway + Math.sin(t * 38) * OC.wobble + jitter;
+    g.rotation.z = C.roll + fid.sway * 0.012 + Math.sin(t * 38) * OC.wobble + jitter;
 
-    // Tail bend: wag amplitude/speed from the oscillators; droop pins it down.
-    const wag = reduceMotion ? 0 : Math.sin(t * OC.wagSpeed) * OC.wagAmp;
-    for (const u of wagSets.current) {
+    // Head shader = spring (deliberate) + fidget + walk-nod + shake (fast, additive).
+    const headYaw = hYaw.current.x + fid.yaw * 0.03 + shake;
+    const headPitch = hPitch.current.x + fid.pitch * 0.022 + walkNod;
+    const headRoll = hRoll.current.x + fid.roll * 0.02;
+    for (const u of deform.current) {
+      u.uHeadYaw.value = headYaw;
+      u.uHeadPitch.value = headPitch;
+      u.uHeadRoll.value = headRoll;
+      const wag = reduceMotion ? 0 : Math.sin(t * OC.wagSpeed) * OC.wagAmp;
       u.uWag.value = wag;
-      // Negative: rotating rear-side content around `side = up × face` by a
-      // POSITIVE angle lifts the tail — sadness needs the opposite.
       u.uDroop.value = -OC.droop * 0.55;
     }
 
-    // Tongue rides the (damped) mouth-open target — pant, bark, yawn, joy.
+    // Tongue tracks the moving muzzle: rotate the mouth anchor by the head angles.
     const tng = tongue.current;
     const sn = snout.current;
     if (tng && sn) {
       const out = C.mouth;
       tng.visible = out > 0.02;
+      const p = tng.position.copy(sn.mouth).sub(sn.neck);
+      p.applyAxisAngle(sn.up, headYaw);
+      p.applyAxisAngle(sn.side, headPitch);
+      p.applyAxisAngle(sn.face, headRoll);
+      p.add(sn.neck).addScaledVector(sn.face, 0.05 * out * (1 + 0.12 * Math.sin(t * 12)));
       tng.quaternion.copy(sn.quat);
-      tng.position
-        .copy(sn.mouth)
-        .addScaledVector(sn.face, 0.05 * out * (1 + 0.12 * Math.sin(t * 12)));
       const w = 2.4 * out;
       tng.scale.set(0.055 * w, 0.035 * w, 0.085 * w);
     }
@@ -521,12 +578,8 @@ export default function RealisticPupStage({
   const trigger = useBulldogStore((s) => s.trigger);
   const spin = useRef(HERO_ANGLE);
 
-  // Drag spins, tap bounces. runOnJS: the callbacks mutate plain refs read by
-  // three's JS-thread render loop, so they must not be workletized.
   const gestures = useMemo(() => {
     const pan = Gesture.Pan()
-      // Horizontal-only activation: the Den hero lives in a ScrollView and the
-      // turntable must never capture vertical scroll swipes.
       .activeOffsetX([-12, 12])
       .failOffsetY([-14, 14])
       .runOnJS(true)
@@ -543,11 +596,8 @@ export default function RealisticPupStage({
     return Gesture.Race(pan, tap);
   }, [trigger]);
 
-  // The iOS SIMULATOR's GL initializes but never presents a frame (verified
-  // 2026-07-12). Real iPhones and Android are fine — say so, don't show a void.
   const frame = width != null ? { height, width, alignSelf: 'center' as const } : { height };
-  // Small stages (the Den's pulse ring) get a tighter wander radius so he
-  // roams within the ring instead of trotting out of frame.
+  // Small stages (the Den's pulse ring) get a tighter wander radius.
   const roam = width != null && width < 220 ? 0.35 : 1;
 
   if (Platform.OS === 'ios' && !Device.isDevice) {
@@ -567,8 +617,6 @@ export default function RealisticPupStage({
     <View style={[styles.wrap, frame]}>
       <Canvas
         style={styles.flex}
-        // Explicit PCF: bare `shadows` means PCFSoft, which three 0.185 deprecated
-        // (it falls back to PCF with a LogBox warning on every mount).
         shadows={{ type: PCFShadowMap }}
         camera={{ position: [0, 1.0, 3.8], fov: 42 }}
         gl={{ antialias: true }}>
@@ -589,7 +637,6 @@ export default function RealisticPupStage({
           <PuppyModel spin={spin} roam={roam} />
         </Suspense>
       </Canvas>
-      {/* Transparent gesture layer ABOVE the canvas — the GL view eats touches otherwise. */}
       <GestureDetector gesture={gestures}>
         <View
           accessibilityRole="button"
