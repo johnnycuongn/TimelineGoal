@@ -6,13 +6,16 @@
  * Press = spring squish + tick haptic (motion-spec: touch answers in 100ms).
  */
 
+import { Image } from 'expo-image';
 import { Pressable, StyleSheet, View } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
 
 import { Text } from '@/components/text';
+import { storage } from '@/lib/firebase';
 import { elevation, haptics, pressScale, radius, spacing, spring, useTheme } from '@/theme';
 import { tintColor } from './api';
 import type { CornerWithId } from './hooks';
+import { useStorageUrl } from './photos';
 
 /** Scatter placements for up to 3 charms — tilted like stickers on a scrapbook. */
 const CHARM_POSES = [
@@ -29,6 +32,7 @@ interface CornerCardProps {
 
 export function CornerCard({ corner, onPress, onLongPress }: CornerCardProps) {
   const { colors, isDark } = useTheme();
+  const coverUrl = useStorageUrl(corner.coverPhoto, storage);
   const scale = useSharedValue(1);
   const style = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
 
@@ -54,6 +58,9 @@ export function CornerCard({ corner, onPress, onLongPress }: CornerCardProps) {
             styles.cover,
             { backgroundColor: tintColor(corner.tint, isDark ? 'dark' : 'light') },
           ]}>
+          {coverUrl ? (
+            <Image source={{ uri: coverUrl }} style={StyleSheet.absoluteFill} contentFit="cover" transition={200} />
+          ) : null}
           {corner.charms.slice(0, CHARM_POSES.length).map((charm, i) => (
             <Text key={`${charm}-${i}`} style={[styles.charm, CHARM_POSES[i]]}>
               {charm}

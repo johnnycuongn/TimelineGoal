@@ -3,6 +3,7 @@
  * Photo pins arrive with the Storage item; polls have their own modal.
  */
 
+import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
@@ -13,12 +14,13 @@ import { Text } from '@/components/text';
 import { TextField } from '@/components/text-field';
 import { useAuth } from '@/features/auth/AuthProvider';
 import { useCouple } from '@/features/couple/CoupleProvider';
+import { compressPhoto, pickPhoto, uploadCouplePhoto, type PickedPhoto } from '@/features/corners/photos';
 import { createPin } from '@/features/corners/pins';
 import { MAX_POLL_OPTIONS, createPoll } from '@/features/corners/polls';
-import { db } from '@/lib/firebase';
+import { db, storage } from '@/lib/firebase';
 import { haptics, radius, spacing, touchTarget, useTheme } from '@/theme';
 
-type PinKind = 'note' | 'link' | 'poll';
+type PinKind = 'note' | 'link' | 'photo' | 'poll';
 
 export default function NewPinScreen() {
   const router = useRouter();
@@ -32,6 +34,7 @@ export default function NewPinScreen() {
   const [url, setUrl] = useState('');
   const [question, setQuestion] = useState('');
   const [options, setOptions] = useState<string[]>(['', '']);
+  const [photo, setPhoto] = useState<PickedPhoto | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | undefined>();
 
@@ -47,6 +50,10 @@ export default function NewPinScreen() {
         setError('A poll needs a question and at least two choices.');
         return;
       }
+    }
+    if (kind === 'photo' && !photo) {
+      setError('Pick a photo first — the cute one.');
+      return;
     }
     if (kind === 'link') {
       const normalized = /^https?:\/\//i.test(url.trim()) ? url.trim() : `https://${url.trim()}`;
@@ -69,6 +76,14 @@ export default function NewPinScreen() {
           question,
           options: options.map((o) => o.trim()).filter(Boolean),
         });
+      } else if (kind === 'photo' && photo) {
+        const localUri = await compressPhoto(photo);
+        const photoPath = await uploadCouplePhoto(storage, {
+          coupleId,
+          folder: `corners/${cornerId}`,
+          localUri,
+        });
+        await createPin(db, { coupleId, cornerId, uid: user.uid, pin: { type: 'photo', photoPath } });
       } else {
         await createPin(db, {
           coupleId,
@@ -85,7 +100,8 @@ export default function NewPinScreen() {
       }
       haptics.success();
       router.back();
-    } catch {
+    } catch (err) {
+      if (__DEV__) console.warn('[new-pin] save failed:', err);
       setError('Couldn’t pin that just now — try again?');
       setBusy(false);
     }
@@ -131,6 +147,7 @@ export default function NewPinScreen() {
           <View style={styles.chips}>
             {chip(kind === 'note', '📝 A note', () => setKind('note'))}
             {chip(kind === 'link', '🔗 A link', () => setKind('link'))}
+            {chip(kind === 'photo', '📷 A photo', () => setKind('photo'))}
             {chip(kind === 'poll', '📊 A poll', () => setKind('poll'))}
           </View>
 
@@ -143,6 +160,28 @@ export default function NewPinScreen() {
               maxLength={140}
               error={error}
             />
+          ) : kind === 'photo' ? (
+            <View style={styles.pollFields}>
+              <Button
+                label={photo ? 'Pick a different photo' : 'Choose a photo'}
+                variant="ghost"
+                onPress={async () => {
+                  const picked = await pickPhoto();
+                  if (picked) {
+                    setError(undefined);
+                    setPhoto(picked);
+                  }
+                }}
+              />
+              {photo ? (
+                <Image source={{ uri: photo.uri }} style={styles.preview} contentFit="cover" />
+              ) : null}
+              {error ? (
+                <Text variant="caption" color="destructive">
+                  {error}
+                </Text>
+              ) : null}
+            </View>
           ) : kind === 'link' ? (
             <TextField
               label="The link"
@@ -200,6 +239,7 @@ const styles = StyleSheet.create({
   body: { gap: spacing.lg, paddingTop: spacing.md, paddingBottom: spacing.lg },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   pollFields: { gap: spacing.md },
+  preview: { width: '100%', height: 220, borderRadius: radius.lg },
   chip: {
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,

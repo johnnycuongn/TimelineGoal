@@ -19,6 +19,7 @@
     "expo-constants": "~57.0.3",
     "expo-crypto": "~57.0.0",
     "expo-device": "~57.0.0",
+    "expo-file-system": "~57.0.1",
     "expo-font": "~57.0.0",
     "expo-gl": "~57.0.1",
     "expo-glass-effect": "~57.0.0",
@@ -71,7 +72,7 @@
     "typecheck": "tsc --noEmit",
     "test": "jest",
     "test:watch": "jest --watch",
-    "test:emulator": "firebase emulators:exec --only firestore --project demo-timelinegoal \"jest --config jest.emulator.config.js --runInBand\"",
+    "test:emulator": "firebase emulators:exec --only firestore,storage --project demo-timelinegoal \"jest --config jest.emulator.config.js --runInBand\"",
     "emulators": "firebase emulators:start --project demo-timelinegoal"
   },
   "jest": {

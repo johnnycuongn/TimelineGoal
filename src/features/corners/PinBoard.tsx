@@ -7,6 +7,7 @@
  * Tap a link pin to open it; long-press any pin to unpin.
  */
 
+import { Image } from 'expo-image';
 import { openBrowserAsync } from 'expo-web-browser';
 import { BarChart3, Link2, StickyNote } from 'lucide-react-native';
 import { useEffect, useMemo, useState } from 'react';
@@ -19,10 +20,11 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import { Text } from '@/components/text';
-import { db } from '@/lib/firebase';
+import { db, storage } from '@/lib/firebase';
 import { elevation, haptics, radius, spacing, spring, useTheme } from '@/theme';
 import { tintColor } from './api';
 import type { PinWithId } from './hooks';
+import { useStorageUrl } from './photos';
 import { deletePin, movePin } from './pins';
 import { decidePin, votePoll } from './polls';
 
@@ -110,72 +112,47 @@ function PinSticker({
 }) {
   const { colors, isDark } = useTheme();
 
-  // Board coords → pixels (anchor = sticker center). Primitives only from here
-  // down — worklet closures must never capture `pin` itself (its Firestore
-  // Timestamp can't be copied to the UI runtime).
+  const w = pin.type === 'poll' ? POLL_W : PIN_W;
   const rot = pin.position.rot;
   const pinId = pin.id;
-  const w = pin.type === 'poll' ? POLL_W : PIN_W;
-  const maxX = Math.max(1, boardW - w);
-  const maxY = Math.max(1, boardH - PIN_H);
-  const px = Math.min(maxX, Math.max(0, pin.position.x * boardW - w / 2));
-  const py = Math.min(maxY, Math.max(0, pin.position.y * boardH - PIN_H / 2));
-
-  const x = useSharedValue(px);
-  const y = useSharedValue(py);
-  const dragging = useSharedValue(false);
-
-  // Partner moved it (or a fresh snapshot landed): glide to the synced spot —
-  // unless this finger is mid-drag (the drag owns the position until release).
-  useEffect(() => {
-    if (!dragging.value) {
-      x.value = withSpring(px, spring.default);
-      y.value = withSpring(py, spring.default);
-    }
-  }, [px, py, x, y, dragging]);
-
-  const isLink = pin.type === 'link';
   const url = pin.url;
+  const isLink = pin.type === 'link';
 
-  const gesture = useMemo(() => {
-    const pan = Gesture.Pan()
-      .activateAfterLongPress(120) // don't fight vertical scrolls; a beat of hold = pick up
-      .runOnJS(true)
-      .onStart(() => {
-        dragging.value = true;
-      })
-      .onChange((e) => {
-        x.value = Math.min(maxX, Math.max(0, x.value + e.changeX));
-        y.value = Math.min(maxY, Math.max(0, y.value + e.changeY));
-      })
-      .onEnd(() => {
-        dragging.value = false;
-        const cx = Math.min(1, Math.max(0, (x.value + w / 2) / boardW));
-        const cy = Math.min(1, Math.max(0, (y.value + PIN_H / 2) / boardH));
-        void movePin(db, {
-          coupleId,
-          cornerId,
-          pinId,
-          position: { x: cx, y: cy, rot },
-        });
-      })
-      .onFinalize(() => {
-        dragging.value = false;
-      });
+  const label =
+    pin.type === 'note'
+      ? `Note: ${pin.note}`
+      : pin.type === 'link'
+        ? `Link to ${hostOf(pin.url ?? '')}`
+        : pin.type === 'poll'
+          ? `Poll: ${pin.poll?.question ?? ''}`
+          : 'Photo pin';
 
-    const tap = Gesture.Tap()
-      .runOnJS(true)
-      .onEnd(() => {
-        if (isLink && url) {
-          haptics.tick();
-          void openBrowserAsync(url);
-        }
-      });
+  const noteBg = tintColor('butter', isDark ? 'dark' : 'light');
 
-    const unpin = Gesture.LongPress()
-      .minDuration(600)
-      .runOnJS(true)
-      .onStart(() => {
+  return (
+    <DraggableSticker
+      x={pin.position.x}
+      y={pin.position.y}
+      rot={rot}
+      w={w}
+      isPoll={pin.type === 'poll'}
+      boardW={boardW}
+      boardH={boardH}
+      label={label}
+      bg={pin.type === 'note' ? noteBg : colors.surface}
+      borderColor={pin.type === 'note' ? undefined : colors.border}
+      onTap={
+        isLink && url
+          ? () => {
+              haptics.tick();
+              void openBrowserAsync(url);
+            }
+          : undefined
+      }
+      onDragEnd={(cx, cy) => {
+        void movePin(db, { coupleId, cornerId, pinId, position: { x: cx, y: cy, rot } });
+      }}
+      onUnpin={() => {
         haptics.tick();
         Alert.alert('Unpin this?', 'It comes off the board for both of you.', [
           { text: 'Keep it', style: 'cancel' },
@@ -185,80 +162,157 @@ function PinSticker({
             onPress: () => void deletePin(db, coupleId, cornerId, pinId),
           },
         ]);
+      }}>
+      {pin.decided ? <Text style={styles.stamp}>⭐</Text> : null}
+      {pin.type === 'note' ? (
+        <>
+          <StickyNote color={colors.textSecondary} size={14} />
+          <Text variant="caption" numberOfLines={3}>
+            {pin.note}
+          </Text>
+        </>
+      ) : pin.type === 'link' ? (
+        <>
+          <Link2 color={colors.primary} size={14} />
+          <Text variant="caption" color="primary" numberOfLines={1}>
+            {hostOf(pin.url ?? '')}
+          </Text>
+          <Text variant="caption" color="textSecondary" numberOfLines={2}>
+            {pin.url}
+          </Text>
+        </>
+      ) : pin.type === 'poll' && pin.poll ? (
+        <PollBody
+          pin={pin}
+          coupleId={coupleId}
+          cornerId={cornerId}
+          myUid={myUid}
+          partnerColors={partnerColors}
+          memberCount={memberCount}
+          onMakeGoal={onMakeGoal}
+        />
+      ) : (
+        <PhotoBody path={pin.photoPath} />
+      )}
+    </DraggableSticker>
+  );
+}
+
+/**
+ * The animated shell of a sticker. DELIBERATELY primitives-only: every value in
+ * this component's scope is a number/string/boolean/callback, so no worklet
+ * closure (gesture handlers, useAnimatedStyle) can ever capture a Firestore doc
+ * — Timestamps can't cross into the UI runtime ("[Worklets] Cannot copy value
+ * of type Timestamp"), and with the React Compiler sharing memo slots across
+ * the component, keeping docs out of scope entirely is the only safe shape.
+ */
+function DraggableSticker({
+  x,
+  y,
+  rot,
+  w,
+  isPoll,
+  boardW,
+  boardH,
+  label,
+  bg,
+  borderColor,
+  onTap,
+  onDragEnd,
+  onUnpin,
+  children,
+}: {
+  /** Normalized board coords (0..1) of the sticker center. */
+  x: number;
+  y: number;
+  rot: number;
+  w: number;
+  isPoll: boolean;
+  boardW: number;
+  boardH: number;
+  label: string;
+  bg: string;
+  borderColor?: string;
+  onTap?: () => void;
+  onDragEnd: (cx: number, cy: number) => void;
+  onUnpin: () => void;
+  children: React.ReactNode;
+}) {
+  const maxX = Math.max(1, boardW - w);
+  const maxY = Math.max(1, boardH - PIN_H);
+  const px = Math.min(maxX, Math.max(0, x * boardW - w / 2));
+  const py = Math.min(maxY, Math.max(0, y * boardH - PIN_H / 2));
+
+  const tx = useSharedValue(px);
+  const ty = useSharedValue(py);
+  const dragging = useSharedValue(false);
+
+  // Partner moved it (or a fresh snapshot landed): glide to the synced spot —
+  // unless this finger is mid-drag (the drag owns the position until release).
+  useEffect(() => {
+    if (!dragging.value) {
+      tx.value = withSpring(px, spring.default);
+      ty.value = withSpring(py, spring.default);
+    }
+  }, [px, py, tx, ty, dragging]);
+
+  const gesture = useMemo(() => {
+    const pan = Gesture.Pan()
+      .activateAfterLongPress(120) // don't fight vertical scrolls; a beat of hold = pick up
+      .runOnJS(true)
+      .onStart(() => {
+        dragging.value = true;
+      })
+      .onChange((e) => {
+        tx.value = Math.min(maxX, Math.max(0, tx.value + e.changeX));
+        ty.value = Math.min(maxY, Math.max(0, ty.value + e.changeY));
+      })
+      .onEnd(() => {
+        dragging.value = false;
+        onDragEnd(
+          Math.min(1, Math.max(0, (tx.value + w / 2) / boardW)),
+          Math.min(1, Math.max(0, (ty.value + PIN_H / 2) / boardH)),
+        );
+      })
+      .onFinalize(() => {
+        dragging.value = false;
       });
 
-    // Polls keep taps for their option rows (child Pressables) — a quick tap
-    // activates no gesture (pan needs a 120ms hold, unpin 600ms), so it falls
-    // through to the children.
-    return isLink ? Gesture.Exclusive(pan, unpin, tap) : Gesture.Exclusive(pan, unpin);
+    const unpin = Gesture.LongPress().minDuration(600).runOnJS(true).onStart(onUnpin);
+
+    // Priority order matters: unpin (600ms still hold) must come BEFORE pan —
+    // the pan activates after a 120ms hold, and once it wins, the long-press
+    // can never fire. This way: move >10dp fails the long-press and the pan
+    // takes over (drag); stay still 600ms and the unpin dialog opens. Quick
+    // taps activate nothing (or the tap gesture on link pins) and fall through
+    // to poll option rows.
+    if (!onTap) return Gesture.Exclusive(unpin, pan);
+    const tap = Gesture.Tap().runOnJS(true).onEnd(onTap);
+    return Gesture.Exclusive(unpin, pan, tap);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- shared values are stable refs
-  }, [boardW, boardH, coupleId, cornerId, pinId, rot, isLink, url, maxX, maxY, w]);
+  }, [boardW, boardH, w, maxX, maxY, onDragEnd, onUnpin, onTap]);
 
   const style = useAnimatedStyle(() => ({
     transform: [
-      { translateX: x.value },
-      { translateY: y.value },
+      { translateX: tx.value },
+      { translateY: ty.value },
       { rotate: `${rot}deg` },
       { scale: withSpring(dragging.value ? 1.06 : 1, spring.press) },
     ],
   }));
 
-  const noteBg = tintColor('butter', isDark ? 'dark' : 'light');
-
   return (
     <GestureDetector gesture={gesture}>
       <Animated.View
         accessible
-        accessibilityLabel={
-          pin.type === 'note'
-            ? `Note: ${pin.note}`
-            : pin.type === 'link'
-              ? `Link to ${hostOf(pin.url ?? '')}`
-              : pin.type === 'poll'
-                ? `Poll: ${pin.poll?.question ?? ''}`
-                : 'Photo pin'
-        }
+        accessibilityLabel={label}
         style={[
           styles.pin,
-          pin.type === 'poll' ? styles.poll : null,
+          isPoll ? styles.poll : null,
           style,
-          pin.type === 'note'
-            ? { backgroundColor: noteBg }
-            : { backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 1 },
+          borderColor ? { backgroundColor: bg, borderColor, borderWidth: 1 } : { backgroundColor: bg },
         ]}>
-        {pin.decided ? <Text style={styles.stamp}>⭐</Text> : null}
-        {pin.type === 'note' ? (
-          <>
-            <StickyNote color={colors.textSecondary} size={14} />
-            <Text variant="caption" numberOfLines={3}>
-              {pin.note}
-            </Text>
-          </>
-        ) : pin.type === 'link' ? (
-          <>
-            <Link2 color={colors.primary} size={14} />
-            <Text variant="caption" color="primary" numberOfLines={1}>
-              {hostOf(pin.url ?? '')}
-            </Text>
-            <Text variant="caption" color="textSecondary" numberOfLines={2}>
-              {pin.url}
-            </Text>
-          </>
-        ) : pin.type === 'poll' && pin.poll ? (
-          <PollBody
-            pin={pin}
-            coupleId={coupleId}
-            cornerId={cornerId}
-            myUid={myUid}
-            partnerColors={partnerColors}
-            memberCount={memberCount}
-            onMakeGoal={onMakeGoal}
-          />
-        ) : (
-          <Text variant="caption" color="textSecondary">
-            📷 photo — soon
-          </Text>
-        )}
+        {children}
       </Animated.View>
     </GestureDetector>
   );
@@ -373,6 +427,16 @@ function PollBody({
   );
 }
 
+function PhotoBody({ path }: { path: string | undefined }) {
+  const { colors } = useTheme();
+  const url = useStorageUrl(path, storage);
+  return url ? (
+    <Image source={{ uri: url }} style={styles.photo} contentFit="cover" transition={200} />
+  ) : (
+    <View style={[styles.photo, { backgroundColor: colors.muted }]} />
+  );
+}
+
 const styles = StyleSheet.create({
   board: { alignSelf: 'stretch' },
   pin: {
@@ -385,6 +449,7 @@ const styles = StyleSheet.create({
     ...elevation.soft,
   },
   poll: { width: POLL_W, gap: spacing.xs },
+  photo: { width: '100%', height: 96, borderRadius: radius.sm },
   pollHead: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
   pollQuestion: { flex: 1 },
   pollOption: {

@@ -17,18 +17,21 @@ import {
   View,
 } from 'react-native';
 
+import { Image } from 'expo-image';
+
 import { Loading } from '@/components/loading';
 import { Screen } from '@/components/screen';
 import { Text } from '@/components/text';
 import { useAuth } from '@/features/auth/AuthProvider';
 import { useCouple } from '@/features/couple/CoupleProvider';
-import { tintColor } from '@/features/corners/api';
+import { tintColor, updateCorner } from '@/features/corners/api';
+import { pickCompressUpload, useStorageUrl } from '@/features/corners/photos';
 import { reactToMessage, sendMessage } from '@/features/corners/chat';
 import { useCorner, useMessages, usePins, type MessageWithId, type PinWithId } from '@/features/corners/hooks';
 import { decideMessage } from '@/features/corners/polls';
 import { MessageBubble } from '@/features/corners/MessageBubble';
 import { PinBoard } from '@/features/corners/PinBoard';
-import { db } from '@/lib/firebase';
+import { db, storage } from '@/lib/firebase';
 import { fontFamily, fontSize, haptics, radius, spacing, touchTarget, useTheme } from '@/theme';
 
 export default function CornerScreen() {
@@ -43,6 +46,7 @@ export default function CornerScreen() {
 
   const [draft, setDraft] = useState('');
   const [sending, setSending] = useState(false);
+  const coverUrl = useStorageUrl(corner?.coverPhoto, storage);
 
   async function send() {
     if (!user || !coupleId || !cornerId || !draft.trim() || sending) return;
@@ -92,6 +96,32 @@ export default function CornerScreen() {
       title: winner ? `${winner} — ${pin.poll?.question ?? ''}` : (pin.note ?? ''),
       pinId: pin.id,
     });
+  }
+
+  /** Long-press the cover: dress the corner in a photo (either partner may). */
+  function coverMenu() {
+    if (!coupleId || !cornerId) return;
+    haptics.tick();
+    Alert.alert('Dress up this corner?', 'A cover photo shows on the grid for both of you.', [
+      { text: 'Not now', style: 'cancel' },
+      {
+        text: corner?.coverPhoto ? 'Change the photo' : 'Choose a photo',
+        onPress: async () => {
+          try {
+            const path = await pickCompressUpload(storage, {
+              coupleId,
+              folder: `corners/${cornerId}/cover`,
+            });
+            if (path) {
+              await updateCorner(db, coupleId, cornerId, { coverPhoto: path });
+              haptics.success();
+            }
+          } catch {
+            // quiet — the tint stays; they can retry
+          }
+        },
+      },
+    ]);
   }
 
   /** Long-press a bubble: stamp it ⭐ as our decision (either partner may). */
@@ -149,11 +179,16 @@ export default function CornerScreen() {
 
   return (
     <Screen edges={['top', 'bottom']} style={styles.noPad}>
-      <View
+      <Pressable
+        accessibilityLabel="Corner cover — long-press to set a photo"
+        onLongPress={coverMenu}
         style={[
           styles.cover,
           { backgroundColor: tintColor(corner.tint, isDark ? 'dark' : 'light') },
         ]}>
+        {coverUrl ? (
+          <Image source={{ uri: coverUrl }} style={styles.coverPhoto} contentFit="cover" transition={250} />
+        ) : null}
         <View style={styles.coverRow}>
           <Pressable
             accessibilityRole="button"
@@ -175,8 +210,10 @@ export default function CornerScreen() {
             ))}
           </View>
         </View>
-        <Text variant="title">{corner.title}</Text>
-      </View>
+        <Text variant="title" style={coverUrl ? styles.titleOnPhoto : undefined}>
+          {corner.title}
+        </Text>
+      </Pressable>
 
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -279,6 +316,14 @@ const styles = StyleSheet.create({
     borderBottomLeftRadius: radius.xl,
     borderBottomRightRadius: radius.xl,
     gap: spacing.xs,
+    overflow: 'hidden',
+  },
+  coverPhoto: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
+  titleOnPhoto: {
+    color: '#FFFFFF',
+    textShadowColor: 'rgba(0,0,0,0.55)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 4,
   },
   coverRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   backBtn: {

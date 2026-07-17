@@ -27,7 +27,7 @@ import {
 import { connectStorageEmulator, getStorage, type FirebaseStorage } from 'firebase/storage';
 
 // Public web config for the `timelinegoal` project.
-const firebaseConfig = {
+const prodConfig = {
   apiKey: 'AIzaSyCG_Z3mVFPm4k-waHuomlxMDjm8nP3ffcc',
   authDomain: 'timelinegoal.firebaseapp.com',
   projectId: 'timelinegoal',
@@ -62,6 +62,22 @@ const EMULATOR_HOST =
 /** In dev, use emulators unless explicitly disabled. */
 const USE_EMULATORS =
   __DEV__ && process.env.EXPO_PUBLIC_USE_FIREBASE_EMULATORS !== 'false';
+
+/**
+ * Against the emulators, the app must live in the SAME project namespace the
+ * suite was started with (`npm run emulators` → demo-timelinegoal): the storage
+ * rules' cross-service firestore.get() resolves membership inside that project,
+ * so a mismatched projectId gets storage/unauthorized even for real members.
+ * (demo-* ids also guarantee the emulators never touch prod.)
+ */
+const firebaseConfig = USE_EMULATORS
+  ? {
+      ...prodConfig,
+      projectId: 'demo-timelinegoal',
+      authDomain: 'demo-timelinegoal.firebaseapp.com',
+      storageBucket: 'demo-timelinegoal.appspot.com',
+    }
+  : prodConfig;
 
 const app = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
 
