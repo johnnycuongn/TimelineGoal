@@ -3,11 +3,11 @@
  * is ambient; a corner your partner just touched floats up the grid on its own).
  */
 
-import { collection, doc, onSnapshot, orderBy, query } from 'firebase/firestore';
+import { collection, doc, limit, onSnapshot, orderBy, query } from 'firebase/firestore';
 import { useEffect, useState } from 'react';
 
 import { db } from '@/lib/firebase';
-import { CORNERS, COUPLES, type Corner } from '@/lib/types';
+import { CORNERS, COUPLES, MESSAGES, type Corner, type CornerMessage } from '@/lib/types';
 
 export interface CornerWithId extends Corner {
   id: string;
@@ -39,6 +39,43 @@ export function useCorners(coupleId: string | null): {
   }, [coupleId]);
 
   return { corners, loading };
+}
+
+export interface MessageWithId extends CornerMessage {
+  id: string;
+}
+
+/**
+ * Live chat for one corner, newest first (feed an inverted list).
+ * Capped at the most recent 80 — a couple's chat page, not a group archive.
+ */
+export function useMessages(
+  coupleId: string | null,
+  cornerId: string | null,
+  max = 80,
+): { messages: MessageWithId[]; loading: boolean } {
+  const [messages, setMessages] = useState<MessageWithId[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!coupleId || !cornerId) {
+      setMessages([]);
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    const q = query(
+      collection(db, COUPLES, coupleId, CORNERS, cornerId, MESSAGES),
+      orderBy('at', 'desc'),
+      limit(max),
+    );
+    return onSnapshot(q, (snap) => {
+      setMessages(snap.docs.map((d) => ({ id: d.id, ...(d.data() as CornerMessage) })));
+      setLoading(false);
+    });
+  }, [coupleId, cornerId, max]);
+
+  return { messages, loading };
 }
 
 /** Live single corner (the corner screen header watches title/charms/cover). */

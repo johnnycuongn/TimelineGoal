@@ -112,6 +112,22 @@ export interface Corner {
   lastActivityAt: Timestamp;
 }
 
+/**
+ * One chat message inside a corner — an append-only keepsake, like check-ins.
+ * Lives at couples/{coupleId}/corners/{cornerId}/messages/{id}.
+ */
+export interface CornerMessage {
+  uid: string;
+  text: string;
+  at: Timestamp;
+  /** One emoji reaction per partner, keyed by reacting uid. */
+  reactions?: Record<string, string>;
+  /** ⭐ stamped when the couple marks this message a decision (M4 polls item). */
+  decided?: boolean;
+  /** Set once the decision is converted into a Timeline goal. */
+  linkedGoalId?: string | null;
+}
+
 export const COUPLES = 'couples';
 export const USERS = 'users';
 export const INVITES = 'invites';
@@ -119,3 +135,4 @@ export const GOALS = 'goals';
 export const CHECKINS = 'checkins';
 export const ACTIVITY = 'activity';
 export const CORNERS = 'corners';
+export const MESSAGES = 'messages';
