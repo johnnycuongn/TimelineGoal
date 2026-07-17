@@ -93,9 +93,29 @@ export interface Activity {
   reactions?: Record<string, string>;
 }
 
+/**
+ * A shared topic space — one cozy board per thing the couple is planning,
+ * discussing or deciding. Lives at couples/{coupleId}/corners/{cornerId}.
+ * No owner concept: either partner creates and edits, both always see it.
+ */
+export interface Corner {
+  title: string;
+  /** Up to 3 user-chosen emoji decorating the card (decoration, never UI icons). */
+  charms: string[];
+  /** Named soft tint for the card cover (resolved per light/dark theme at render). */
+  tint: string;
+  /** Storage path of the cover photo once one is set; tint shows until then. */
+  coverPhoto?: string | null;
+  createdBy: string;
+  createdAt: Timestamp;
+  /** Bumped by chat + pins so the grid can order by "most alive". */
+  lastActivityAt: Timestamp;
+}
+
 export const COUPLES = 'couples';
 export const USERS = 'users';
 export const INVITES = 'invites';
 export const GOALS = 'goals';
 export const CHECKINS = 'checkins';
 export const ACTIVITY = 'activity';
+export const CORNERS = 'corners';
