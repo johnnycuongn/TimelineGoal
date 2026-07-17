@@ -128,6 +128,39 @@ export interface CornerMessage {
   linkedGoalId?: string | null;
 }
 
+/** Normalized scrapbook coordinates: 0..1 of the board, plus sticker tilt in degrees. */
+export interface PinPosition {
+  x: number;
+  y: number;
+  rot: number;
+}
+
+/**
+ * A scrapbook card pinned in a corner — note, link, photo, or poll.
+ * Lives at couples/{coupleId}/corners/{cornerId}/pins/{id}.
+ */
+export interface Pin {
+  type: 'note' | 'link' | 'photo' | 'poll';
+  position: PinPosition;
+  note?: string;
+  url?: string;
+  /** Storage path under couples/{coupleId}/ (set once Storage lands in M4). */
+  photoPath?: string;
+  /** Poll payload (M4 polls item): options + one vote per partner. */
+  poll?: {
+    question: string;
+    options: string[];
+    /** uid → chosen option index. */
+    votes: Record<string, number>;
+  };
+  /** ⭐ stamped when the couple marks this a decision. */
+  decided?: boolean;
+  /** Set once the decision is converted into a Timeline goal. */
+  linkedGoalId?: string | null;
+  createdBy: string;
+  createdAt: Timestamp;
+}
+
 export const COUPLES = 'couples';
 export const USERS = 'users';
 export const INVITES = 'invites';
@@ -136,3 +169,4 @@ export const CHECKINS = 'checkins';
 export const ACTIVITY = 'activity';
 export const CORNERS = 'corners';
 export const MESSAGES = 'messages';
+export const PINS = 'pins';

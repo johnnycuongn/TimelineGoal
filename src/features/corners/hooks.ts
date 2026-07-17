@@ -7,7 +7,15 @@ import { collection, doc, limit, onSnapshot, orderBy, query } from 'firebase/fir
 import { useEffect, useState } from 'react';
 
 import { db } from '@/lib/firebase';
-import { CORNERS, COUPLES, MESSAGES, type Corner, type CornerMessage } from '@/lib/types';
+import {
+  CORNERS,
+  COUPLES,
+  MESSAGES,
+  PINS,
+  type Corner,
+  type CornerMessage,
+  type Pin,
+} from '@/lib/types';
 
 export interface CornerWithId extends Corner {
   id: string;
@@ -76,6 +84,34 @@ export function useMessages(
   }, [coupleId, cornerId, max]);
 
   return { messages, loading };
+}
+
+export interface PinWithId extends Pin {
+  id: string;
+}
+
+/** Live scrapbook pins for one corner, oldest first (stable board layering). */
+export function usePins(
+  coupleId: string | null,
+  cornerId: string | null,
+): { pins: PinWithId[] } {
+  const [pins, setPins] = useState<PinWithId[]>([]);
+
+  useEffect(() => {
+    if (!coupleId || !cornerId) {
+      setPins([]);
+      return;
+    }
+    const q = query(
+      collection(db, COUPLES, coupleId, CORNERS, cornerId, PINS),
+      orderBy('createdAt', 'asc'),
+    );
+    return onSnapshot(q, (snap) => {
+      setPins(snap.docs.map((d) => ({ id: d.id, ...(d.data() as Pin) })));
+    });
+  }, [coupleId, cornerId]);
+
+  return { pins };
 }
 
 /** Live single corner (the corner screen header watches title/charms/cover). */

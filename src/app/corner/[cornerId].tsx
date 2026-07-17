@@ -4,7 +4,7 @@
  */
 
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { ChevronLeft, Send } from 'lucide-react-native';
+import { ChevronLeft, Pin as PinIcon, Send } from 'lucide-react-native';
 import { useState } from 'react';
 import {
   FlatList,
@@ -23,8 +23,9 @@ import { useAuth } from '@/features/auth/AuthProvider';
 import { useCouple } from '@/features/couple/CoupleProvider';
 import { tintColor } from '@/features/corners/api';
 import { reactToMessage, sendMessage } from '@/features/corners/chat';
-import { useCorner, useMessages } from '@/features/corners/hooks';
+import { useCorner, useMessages, usePins } from '@/features/corners/hooks';
 import { MessageBubble } from '@/features/corners/MessageBubble';
+import { PinBoard } from '@/features/corners/PinBoard';
 import { db } from '@/lib/firebase';
 import { fontFamily, fontSize, haptics, radius, spacing, touchTarget, useTheme } from '@/theme';
 
@@ -36,6 +37,7 @@ export default function CornerScreen() {
   const { coupleId, couple } = useCouple();
   const { corner, loading } = useCorner(coupleId, cornerId ?? null);
   const { messages } = useMessages(coupleId, cornerId ?? null);
+  const { pins } = usePins(coupleId, cornerId ?? null);
 
   const [draft, setDraft] = useState('');
   const [sending, setSending] = useState(false);
@@ -117,6 +119,9 @@ export default function CornerScreen() {
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={styles.flex}>
+        {coupleId && cornerId && pins.length > 0 ? (
+          <PinBoard coupleId={coupleId} cornerId={cornerId} pins={pins} height={210} />
+        ) : null}
         {messages.length === 0 ? (
           // Outside the inverted list — `inverted` mirrors its children on Android.
           <View style={styles.empty}>
@@ -148,6 +153,16 @@ export default function CornerScreen() {
         />
 
         <View style={[styles.inputBar, { borderTopColor: colors.border }]}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Pin a note or link to the board"
+            onPress={() => {
+              haptics.tick();
+              router.push(`/new-pin?cornerId=${cornerId}`);
+            }}
+            style={[styles.pinBtn, { backgroundColor: colors.muted }]}>
+            <PinIcon color={colors.primary} size={20} />
+          </Pressable>
           <TextInput
             value={draft}
             onChangeText={setDraft}
@@ -225,6 +240,13 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
     fontFamily: fontFamily.bodyRegular,
     fontSize: fontSize.body,
+  },
+  pinBtn: {
+    width: touchTarget,
+    height: touchTarget,
+    borderRadius: touchTarget / 2,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   sendBtn: {
     width: touchTarget,

@@ -73,6 +73,7 @@ export default function RootLayout() {
                 <Stack.Screen name="new-goal" options={{ presentation: 'modal' }} />
                 <Stack.Screen name="seal/[goalId]" options={{ presentation: 'modal' }} />
                 <Stack.Screen name="new-corner" options={{ presentation: 'modal' }} />
+                <Stack.Screen name="new-pin" options={{ presentation: 'modal' }} />
                 <Stack.Screen name="corner/[cornerId]" />
               </Stack>
             </CoupleProvider>
