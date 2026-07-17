@@ -15,6 +15,7 @@ import { Alert, Pressable, StyleSheet, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
   useAnimatedStyle,
+  useReducedMotion,
   useSharedValue,
   withSpring,
 } from 'react-native-reanimated';
@@ -238,6 +239,7 @@ function DraggableSticker({
   onUnpin: () => void;
   children: React.ReactNode;
 }) {
+  const reduceMotion = useReducedMotion();
   const maxX = Math.max(1, boardW - w);
   const maxY = Math.max(1, boardH - PIN_H);
   const px = Math.min(maxX, Math.max(0, x * boardW - w / 2));
@@ -249,12 +251,13 @@ function DraggableSticker({
 
   // Partner moved it (or a fresh snapshot landed): glide to the synced spot —
   // unless this finger is mid-drag (the drag owns the position until release).
+  // Reduce Motion: jump instead of glide (drag-follow stays — that's the finger).
   useEffect(() => {
     if (!dragging.value) {
-      tx.value = withSpring(px, spring.default);
-      ty.value = withSpring(py, spring.default);
+      tx.value = reduceMotion ? px : withSpring(px, spring.default);
+      ty.value = reduceMotion ? py : withSpring(py, spring.default);
     }
-  }, [px, py, tx, ty, dragging]);
+  }, [px, py, tx, ty, dragging, reduceMotion]);
 
   const gesture = useMemo(() => {
     const pan = Gesture.Pan()
