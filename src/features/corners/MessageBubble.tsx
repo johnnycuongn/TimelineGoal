@@ -20,9 +20,11 @@ interface MessageBubbleProps {
   color: string;
   /** Toggle my ❤️ on my partner's message (undefined on my own bubbles). */
   onToggleHeart?: () => void;
+  /** Long-press menu: stamp ⭐ decision / make it a goal. */
+  onLongPress?: () => void;
 }
 
-export function MessageBubble({ message, mine, color, onToggleHeart }: MessageBubbleProps) {
+export function MessageBubble({ message, mine, color, onToggleHeart, onLongPress }: MessageBubbleProps) {
   const { colors } = useTheme();
   const reduceMotion = useReducedMotion();
   const reactions = Object.values(message.reactions ?? {});
@@ -44,6 +46,7 @@ export function MessageBubble({ message, mine, color, onToggleHeart }: MessageBu
               }
             : undefined
         }
+        onLongPress={onLongPress}
         style={[styles.bubble, { backgroundColor: color }]}>
         <Text variant="body" style={styles.text}>
           {message.text}

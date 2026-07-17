@@ -103,9 +103,9 @@ Two terminals from the project root:
 - [x] Corner grid: create, emoji charms (up to 3, scattered sticker-style), named tint covers (light+dark variants); 2-up grid ordered by lastActivityAt; new-corner modal; corner/[cornerId] screen. Cover **photo** deferred to the Storage item below. Emulator 4/4 + live-verified (Kyoto corner created on-device) *(2026-07-17)*
 - [x] Chat per corner (real-time, reactions): messages subcollection (append-only), partner-color bubbles, tap-partner's-bubble ❤️ toggle, send bumps lastActivityAt in-batch, inverted list + spring-in. Emulator 3/3 + live-verified. Gotcha: Android `inverted` FlatList mirrors children (scale −1) — empty states must render OUTSIDE the list *(2026-07-17)*
 - [x] Pins: note / link (+ photo slot awaiting Storage), scrapbook positioning — normalized {x,y,rot} coords, golden-angle scatter placement, drag-to-tidy (120ms hold pickup, spring follow, position syncs on release), tap link opens browser, long-press unpins; new-pin modal from the 📌 in the chat bar. Emulator 4/4 + live-verified (note pinned + dragged). Gotcha: with React Compiler, worklet closures capture whole objects — never let a Firestore doc (Timestamp!) into useAnimatedStyle/gesture closures; extract primitives first *(2026-07-17)*
-- [ ] Polls + ⭐ decided stamps (polls and messages)
-- [ ] "Make it a goal →" decision→Timeline pipeline
-- [ ] Firebase Storage: uploads under `couples/{id}/`, client-side compression, rules
+- [x] Polls + ⭐ decided stamps (polls and messages): poll = pin type 'poll' (question + 2–4 options + ONE changeable vote per partner — deciding together, not outvoting); vote dots in partner colors; when every member's vote agrees, a "⭐ make it official" chip stamps it decided; chat messages stamp via long-press menu (either partner). Emulator 4/4 + live-verified *(2026-07-17)*
+- [x] "Make it a goal →" decision→Timeline pipeline: decided poll/message offers the chip → /new-goal opens PREFILLED (winning option — question), defaults to shared → seal ceremony fires as usual → linkDecisionToGoal writes linkedGoalId back and the sticker shows "on the Timeline 🪜". **Full exit-test flow verified live on-device: discuss → poll → vote → decide ⭐ → converted goal on the Timeline (sealed)** *(2026-07-17)*
+- [ ] Firebase Storage: uploads under `couples/{id}/`, client-side compression, rules — **the one remaining M4 item** (unlocks corner cover photos + photo pins; expo-image-picker/-manipulator already installed)
 
 **Exit test**: discuss → poll → decide ⭐ → converted goal appears on the Timeline.
 

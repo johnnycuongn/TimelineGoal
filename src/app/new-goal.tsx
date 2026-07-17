@@ -4,7 +4,7 @@
  * and creating a SHARED goal hands off to the seal ceremony (both paws in wax).
  */
 
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Minus, Plus } from 'lucide-react-native';
 import { useState } from 'react';
 import {
@@ -22,6 +22,7 @@ import { Text } from '@/components/text';
 import { TextField } from '@/components/text-field';
 import { useAuth } from '@/features/auth/AuthProvider';
 import { useCouple } from '@/features/couple/CoupleProvider';
+import { linkDecisionToGoal } from '@/features/corners/polls';
 import { createGoal } from '@/features/goals/api';
 import { useAllGoals } from '@/features/goals/hooks';
 import { goalsForPeriod } from '@/features/goals/ladder';
@@ -49,8 +50,15 @@ export default function NewGoalScreen() {
   const { user } = useAuth();
   const { coupleId } = useCouple();
   const { goals } = useAllGoals(coupleId);
+  // "Make it a goal →" arrives prefilled from a corner decision (⭐ poll/message).
+  const decision = useLocalSearchParams<{
+    title?: string;
+    cornerId?: string;
+    pinId?: string;
+    messageId?: string;
+  }>();
 
-  const [title, setTitle] = useState('');
+  const [title, setTitle] = useState(decision.title ?? '');
   const [charm, setCharm] = useState(CHARMS[0]);
   const [horizon, setHorizon] = useState<Horizon>('week');
   const [owner, setOwner] = useState<'me' | 'shared'>('shared');
@@ -84,6 +92,16 @@ export default function NewGoalScreen() {
         targetUnits: units,
         parentGoalId,
       });
+      if (decision.cornerId && (decision.pinId || decision.messageId)) {
+        // The decision that birthed this goal now points at it (⭐ + link).
+        void linkDecisionToGoal(db, {
+          coupleId,
+          cornerId: decision.cornerId,
+          goalId,
+          pinId: decision.pinId,
+          messageId: decision.messageId,
+        });
+      }
       haptics.success();
       if (owner === 'shared') {
         // A pact deserves a moment: straight into the seal ceremony.

@@ -8,9 +8,9 @@
  */
 
 import { openBrowserAsync } from 'expo-web-browser';
-import { Link2, StickyNote } from 'lucide-react-native';
+import { BarChart3, Link2, StickyNote } from 'lucide-react-native';
 import { useEffect, useMemo, useState } from 'react';
-import { Alert, StyleSheet, View } from 'react-native';
+import { Alert, Pressable, StyleSheet, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
   useAnimatedStyle,
@@ -24,8 +24,10 @@ import { elevation, haptics, radius, spacing, spring, useTheme } from '@/theme';
 import { tintColor } from './api';
 import type { PinWithId } from './hooks';
 import { deletePin, movePin } from './pins';
+import { decidePin, votePoll } from './polls';
 
 const PIN_W = 128;
+const POLL_W = 208;
 const PIN_H = 84;
 
 interface PinBoardProps {
@@ -33,9 +35,24 @@ interface PinBoardProps {
   cornerId: string;
   pins: PinWithId[];
   height: number;
+  /** My uid + the couple's partner colors + member count — polls need all three. */
+  myUid: string;
+  partnerColors: Record<string, string>;
+  memberCount: number;
+  /** "Make it a goal →" tapped on a decided poll. */
+  onMakeGoal: (pin: PinWithId) => void;
 }
 
-export function PinBoard({ coupleId, cornerId, pins, height }: PinBoardProps) {
+export function PinBoard({
+  coupleId,
+  cornerId,
+  pins,
+  height,
+  myUid,
+  partnerColors,
+  memberCount,
+  onMakeGoal,
+}: PinBoardProps) {
   const [width, setWidth] = useState(0);
 
   return (
@@ -51,6 +68,10 @@ export function PinBoard({ coupleId, cornerId, pins, height }: PinBoardProps) {
               pin={pin}
               boardW={width}
               boardH={height}
+              myUid={myUid}
+              partnerColors={partnerColors}
+              memberCount={memberCount}
+              onMakeGoal={onMakeGoal}
             />
           ))
         : null}
@@ -72,12 +93,20 @@ function PinSticker({
   pin,
   boardW,
   boardH,
+  myUid,
+  partnerColors,
+  memberCount,
+  onMakeGoal,
 }: {
   coupleId: string;
   cornerId: string;
   pin: PinWithId;
   boardW: number;
   boardH: number;
+  myUid: string;
+  partnerColors: Record<string, string>;
+  memberCount: number;
+  onMakeGoal: (pin: PinWithId) => void;
 }) {
   const { colors, isDark } = useTheme();
 
@@ -86,9 +115,10 @@ function PinSticker({
   // Timestamp can't be copied to the UI runtime).
   const rot = pin.position.rot;
   const pinId = pin.id;
-  const maxX = Math.max(1, boardW - PIN_W);
+  const w = pin.type === 'poll' ? POLL_W : PIN_W;
+  const maxX = Math.max(1, boardW - w);
   const maxY = Math.max(1, boardH - PIN_H);
-  const px = Math.min(maxX, Math.max(0, pin.position.x * boardW - PIN_W / 2));
+  const px = Math.min(maxX, Math.max(0, pin.position.x * boardW - w / 2));
   const py = Math.min(maxY, Math.max(0, pin.position.y * boardH - PIN_H / 2));
 
   const x = useSharedValue(px);
@@ -120,7 +150,7 @@ function PinSticker({
       })
       .onEnd(() => {
         dragging.value = false;
-        const cx = Math.min(1, Math.max(0, (x.value + PIN_W / 2) / boardW));
+        const cx = Math.min(1, Math.max(0, (x.value + w / 2) / boardW));
         const cy = Math.min(1, Math.max(0, (y.value + PIN_H / 2) / boardH));
         void movePin(db, {
           coupleId,
@@ -157,9 +187,12 @@ function PinSticker({
         ]);
       });
 
-    return Gesture.Exclusive(pan, unpin, tap);
+    // Polls keep taps for their option rows (child Pressables) — a quick tap
+    // activates no gesture (pan needs a 120ms hold, unpin 600ms), so it falls
+    // through to the children.
+    return isLink ? Gesture.Exclusive(pan, unpin, tap) : Gesture.Exclusive(pan, unpin);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- shared values are stable refs
-  }, [boardW, boardH, coupleId, cornerId, pinId, rot, isLink, url, maxX, maxY]);
+  }, [boardW, boardH, coupleId, cornerId, pinId, rot, isLink, url, maxX, maxY, w]);
 
   const style = useAnimatedStyle(() => ({
     transform: [
@@ -181,10 +214,13 @@ function PinSticker({
             ? `Note: ${pin.note}`
             : pin.type === 'link'
               ? `Link to ${hostOf(pin.url ?? '')}`
-              : 'Photo pin'
+              : pin.type === 'poll'
+                ? `Poll: ${pin.poll?.question ?? ''}`
+                : 'Photo pin'
         }
         style={[
           styles.pin,
+          pin.type === 'poll' ? styles.poll : null,
           style,
           pin.type === 'note'
             ? { backgroundColor: noteBg }
@@ -208,6 +244,16 @@ function PinSticker({
               {pin.url}
             </Text>
           </>
+        ) : pin.type === 'poll' && pin.poll ? (
+          <PollBody
+            pin={pin}
+            coupleId={coupleId}
+            cornerId={cornerId}
+            myUid={myUid}
+            partnerColors={partnerColors}
+            memberCount={memberCount}
+            onMakeGoal={onMakeGoal}
+          />
         ) : (
           <Text variant="caption" color="textSecondary">
             📷 photo — soon
@@ -215,6 +261,115 @@ function PinSticker({
         )}
       </Animated.View>
     </GestureDetector>
+  );
+}
+
+/**
+ * The voting face of a poll pin. One changeable vote per partner (dots in each
+ * partner's color). When everyone's vote lands on the same option, the couple
+ * can stamp it ⭐ official; a stamped poll offers "Make it a goal →".
+ */
+function PollBody({
+  pin,
+  coupleId,
+  cornerId,
+  myUid,
+  partnerColors,
+  memberCount,
+  onMakeGoal,
+}: {
+  pin: PinWithId;
+  coupleId: string;
+  cornerId: string;
+  myUid: string;
+  partnerColors: Record<string, string>;
+  memberCount: number;
+  onMakeGoal: (pin: PinWithId) => void;
+}) {
+  const { colors } = useTheme();
+  const poll = pin.poll!;
+  const voteEntries = Object.entries(poll.votes);
+  const consensus =
+    voteEntries.length >= Math.max(1, memberCount) &&
+    voteEntries.every(([, v]) => v === voteEntries[0][1]);
+
+  return (
+    <>
+      <View style={styles.pollHead}>
+        <BarChart3 color={colors.primary} size={14} />
+        <Text variant="label" numberOfLines={2} style={styles.pollQuestion}>
+          {poll.question}
+        </Text>
+      </View>
+      {poll.options.map((opt, idx) => {
+        const voters = voteEntries.filter(([, v]) => v === idx);
+        const iChose = poll.votes[myUid] === idx;
+        return (
+          <Pressable
+            key={`${opt}-${idx}`}
+            accessibilityRole="button"
+            accessibilityState={{ selected: iChose }}
+            accessibilityLabel={`Vote ${opt}`}
+            onPress={() => {
+              haptics.tick();
+              void votePoll(db, { coupleId, cornerId, pinId: pin.id, uid: myUid, optionIndex: idx });
+            }}
+            style={[
+              styles.pollOption,
+              {
+                backgroundColor: iChose ? colors.muted : 'transparent',
+                borderColor: iChose ? colors.primary : colors.border,
+              },
+            ]}>
+            <Text variant="caption" numberOfLines={1} style={styles.pollOptionText}>
+              {opt}
+            </Text>
+            <View style={styles.voteDots}>
+              {voters.map(([uid]) => (
+                <View
+                  key={uid}
+                  style={[
+                    styles.voteDot,
+                    { backgroundColor: partnerColors[uid] ?? colors.secondary },
+                  ]}
+                />
+              ))}
+            </View>
+          </Pressable>
+        );
+      })}
+      {consensus && !pin.decided ? (
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => {
+            haptics.success();
+            void decidePin(db, { coupleId, cornerId, pinId: pin.id, decided: true });
+          }}
+          style={[styles.pollCta, { backgroundColor: colors.primary }]}>
+          <Text variant="caption" color="onPrimary">
+            ⭐ make it official
+          </Text>
+        </Pressable>
+      ) : null}
+      {pin.decided && !pin.linkedGoalId ? (
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => {
+            haptics.tick();
+            onMakeGoal(pin);
+          }}
+          style={[styles.pollCta, { backgroundColor: colors.muted, borderColor: colors.primary, borderWidth: 1 }]}>
+          <Text variant="caption" color="primary">
+            Make it a goal →
+          </Text>
+        </Pressable>
+      ) : null}
+      {pin.linkedGoalId ? (
+        <Text variant="caption" color="textSecondary">
+          on the Timeline 🪜
+        </Text>
+      ) : null}
+    </>
   );
 }
 
@@ -228,6 +383,29 @@ const styles = StyleSheet.create({
     padding: spacing.sm,
     gap: 2,
     ...elevation.soft,
+  },
+  poll: { width: POLL_W, gap: spacing.xs },
+  pollHead: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
+  pollQuestion: { flex: 1 },
+  pollOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    borderWidth: 1,
+    borderRadius: radius.sm,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 6,
+    minHeight: 32,
+  },
+  pollOptionText: { flex: 1 },
+  voteDots: { flexDirection: 'row', gap: 3 },
+  voteDot: { width: 10, height: 10, borderRadius: 5 },
+  pollCta: {
+    alignSelf: 'flex-start',
+    borderRadius: radius.pill,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 5,
+    marginTop: 2,
   },
   stamp: {
     position: 'absolute',

@@ -5,7 +5,7 @@
 
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
-import { KeyboardAvoidingView, Platform, Pressable, StyleSheet, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import { Button } from '@/components/button';
 import { Screen } from '@/components/screen';
@@ -14,10 +14,11 @@ import { TextField } from '@/components/text-field';
 import { useAuth } from '@/features/auth/AuthProvider';
 import { useCouple } from '@/features/couple/CoupleProvider';
 import { createPin } from '@/features/corners/pins';
+import { MAX_POLL_OPTIONS, createPoll } from '@/features/corners/polls';
 import { db } from '@/lib/firebase';
 import { haptics, radius, spacing, touchTarget, useTheme } from '@/theme';
 
-type PinKind = 'note' | 'link';
+type PinKind = 'note' | 'link' | 'poll';
 
 export default function NewPinScreen() {
   const router = useRouter();
@@ -29,6 +30,8 @@ export default function NewPinScreen() {
   const [kind, setKind] = useState<PinKind>('note');
   const [note, setNote] = useState('');
   const [url, setUrl] = useState('');
+  const [question, setQuestion] = useState('');
+  const [options, setOptions] = useState<string[]>(['', '']);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | undefined>();
 
@@ -37,6 +40,13 @@ export default function NewPinScreen() {
     if (kind === 'note' && !note.trim()) {
       setError('A note needs a few words.');
       return;
+    }
+    if (kind === 'poll') {
+      const filled = options.map((o) => o.trim()).filter(Boolean);
+      if (!question.trim() || filled.length < 2) {
+        setError('A poll needs a question and at least two choices.');
+        return;
+      }
     }
     if (kind === 'link') {
       const normalized = /^https?:\/\//i.test(url.trim()) ? url.trim() : `https://${url.trim()}`;
@@ -51,18 +61,28 @@ export default function NewPinScreen() {
     setError(undefined);
     setBusy(true);
     try {
-      await createPin(db, {
-        coupleId,
-        cornerId,
-        uid: user.uid,
-        pin:
-          kind === 'note'
-            ? { type: 'note', note }
-            : {
-                type: 'link',
-                url: /^https?:\/\//i.test(url.trim()) ? url.trim() : `https://${url.trim()}`,
-              },
-      });
+      if (kind === 'poll') {
+        await createPoll(db, {
+          coupleId,
+          cornerId,
+          uid: user.uid,
+          question,
+          options: options.map((o) => o.trim()).filter(Boolean),
+        });
+      } else {
+        await createPin(db, {
+          coupleId,
+          cornerId,
+          uid: user.uid,
+          pin:
+            kind === 'note'
+              ? { type: 'note', note }
+              : {
+                  type: 'link',
+                  url: /^https?:\/\//i.test(url.trim()) ? url.trim() : `https://${url.trim()}`,
+                },
+        });
+      }
       haptics.success();
       router.back();
     } catch {
@@ -98,7 +118,11 @@ export default function NewPinScreen() {
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={styles.flex}>
-        <View style={styles.body}>
+        <ScrollView
+          style={styles.flex}
+          contentContainerStyle={styles.body}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled">
           <Text variant="title">Pin something</Text>
           <Text variant="body" color="textSecondary">
             It goes on the board for both of you — drag it anywhere after.
@@ -107,6 +131,7 @@ export default function NewPinScreen() {
           <View style={styles.chips}>
             {chip(kind === 'note', '📝 A note', () => setKind('note'))}
             {chip(kind === 'link', '🔗 A link', () => setKind('link'))}
+            {chip(kind === 'poll', '📊 A poll', () => setKind('poll'))}
           </View>
 
           {kind === 'note' ? (
@@ -118,7 +143,7 @@ export default function NewPinScreen() {
               maxLength={140}
               error={error}
             />
-          ) : (
+          ) : kind === 'link' ? (
             <TextField
               label="The link"
               value={url}
@@ -128,11 +153,41 @@ export default function NewPinScreen() {
               keyboardType="url"
               error={error}
             />
+          ) : (
+            <View style={styles.pollFields}>
+              <TextField
+                label="The question"
+                value={question}
+                onChangeText={setQuestion}
+                placeholder="e.g. Where do we stay?"
+                maxLength={80}
+                error={error}
+              />
+              {options.map((opt, idx) => (
+                <TextField
+                  key={idx}
+                  label={`Choice ${idx + 1}`}
+                  value={opt}
+                  onChangeText={(next) =>
+                    setOptions((prev) => prev.map((o, i) => (i === idx ? next : o)))
+                  }
+                  placeholder={idx === 0 ? 'e.g. Ryokan' : 'e.g. Hotel'}
+                  maxLength={40}
+                />
+              ))}
+              {options.length < MAX_POLL_OPTIONS ? (
+                <Button
+                  label="Another choice"
+                  variant="ghost"
+                  onPress={() => setOptions((prev) => [...prev, ''])}
+                />
+              ) : null}
+            </View>
           )}
-        </View>
+        </ScrollView>
 
         <View style={styles.footer}>
-          <Button label="Pin it 📌" onPress={save} loading={busy} />
+          <Button label={kind === 'poll' ? 'Ask us 📊' : 'Pin it 📌'} onPress={save} loading={busy} />
           <Button label="Maybe later" variant="ghost" onPress={() => router.back()} />
         </View>
       </KeyboardAvoidingView>
@@ -142,8 +197,9 @@ export default function NewPinScreen() {
 
 const styles = StyleSheet.create({
   flex: { flex: 1 },
-  body: { flex: 1, gap: spacing.lg, paddingTop: spacing.md },
-  chips: { flexDirection: 'row', gap: spacing.sm },
+  body: { gap: spacing.lg, paddingTop: spacing.md, paddingBottom: spacing.lg },
+  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  pollFields: { gap: spacing.md },
   chip: {
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
