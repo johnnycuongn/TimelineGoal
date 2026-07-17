@@ -3,7 +3,8 @@ import { createContext, useContext, useEffect, useMemo, useState, type ReactNode
 
 import { useAuth } from '@/features/auth/AuthProvider';
 import { db } from '@/lib/firebase';
-import { COUPLES, USERS, type Couple } from '@/lib/types';
+import { USERS, type Couple } from '@/lib/types';
+import { watchCouple } from './api';
 
 interface CoupleState {
   /** The user's couple id, once they've created/joined one. */
@@ -43,7 +44,9 @@ export function CoupleProvider({ children }: { children: ReactNode }) {
     });
   }, [user]);
 
-  // Watch the couple doc once we know the id.
+  // Watch the couple doc once we know the id. watchCouple (not a bare onSnapshot)
+  // because the listener attaches mid-pairing-commit and must survive the initial
+  // permission-denied — see the pairing-race note on watchCouple.
   useEffect(() => {
     if (!coupleId) {
       setCouple(null);
@@ -51,8 +54,8 @@ export function CoupleProvider({ children }: { children: ReactNode }) {
       return;
     }
     setCoupleLoaded(false);
-    return onSnapshot(doc(db, COUPLES, coupleId), (snap) => {
-      setCouple(snap.exists() ? (snap.data() as Couple) : null);
+    return watchCouple(db, coupleId, (next) => {
+      setCouple(next);
       setCoupleLoaded(true);
     });
   }, [coupleId]);

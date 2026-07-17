@@ -15,6 +15,7 @@ import {
   doc,
   type Firestore,
   getDoc,
+  onSnapshot,
   runTransaction,
   serverTimestamp,
   setDoc,
@@ -22,7 +23,7 @@ import {
   writeBatch,
 } from 'firebase/firestore';
 
-import { COUPLES, INVITES, USERS } from '@/lib/types';
+import { COUPLES, INVITES, USERS, type Couple } from '@/lib/types';
 import { INVITE_TTL_MS, generateInviteCode, normalizeInviteCode } from './inviteCode';
 
 export class PairingError extends Error {
@@ -150,6 +151,60 @@ export async function joinCouple(
     }
     throw err;
   }
+}
+
+/**
+ * Watch the couple doc, surviving the pairing race.
+ *
+ * When a couple is created/joined, latency compensation fires the local
+ * users/{uid} snapshot before the batch/transaction commits server-side, so the
+ * app attaches this listener while rules still can't see the membership. That
+ * first read comes back permission-denied — and a Firestore listener DIES
+ * permanently on error. Without a retry the app never hears another couple
+ * update and hangs on "loading" (the name-the-bulldog spinner bug).
+ *
+ * So: on permission-denied we re-attach with exponential backoff. If access
+ * truly never materializes we report `null` instead of hanging forever.
+ * Returns an unsubscribe function.
+ */
+export function watchCouple(
+  db: Firestore,
+  coupleId: string,
+  onData: (couple: Couple | null) => void,
+  opts?: { maxRetries?: number; baseDelayMs?: number },
+): () => void {
+  const maxRetries = opts?.maxRetries ?? 6;
+  const baseDelayMs = opts?.baseDelayMs ?? 400;
+  let cancelled = false;
+  let attempt = 0;
+  let retryTimer: ReturnType<typeof setTimeout> | undefined;
+  let unsubscribe: (() => void) | undefined;
+
+  const attach = () => {
+    unsubscribe = onSnapshot(
+      doc(db, COUPLES, coupleId),
+      (snap) => {
+        attempt = 0; // healthy again — future errors get a fresh retry budget
+        onData(snap.exists() ? (snap.data() as Couple) : null);
+      },
+      (err) => {
+        if (cancelled) return;
+        if (isPermissionDenied(err) && attempt < maxRetries) {
+          retryTimer = setTimeout(attach, baseDelayMs * 2 ** attempt);
+          attempt += 1;
+          return;
+        }
+        onData(null); // out of retries (or a non-permission error) — don't hang the UI
+      },
+    );
+  };
+  attach();
+
+  return () => {
+    cancelled = true;
+    if (retryTimer) clearTimeout(retryTimer);
+    unsubscribe?.();
+  };
 }
 
 function isPermissionDenied(err: unknown): boolean {

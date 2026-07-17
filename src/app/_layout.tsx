@@ -16,6 +16,7 @@ import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
+import { LogBox } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
@@ -24,6 +25,14 @@ import { CoupleProvider } from '@/features/couple/CoupleProvider';
 import { useTheme } from '@/theme';
 
 SplashScreen.preventAutoHideAsync();
+
+// Known framework noise on every cold boot: expo-router's ContextNavigator gets a
+// router-store update from the async initial-URL resolution before its first commit
+// (React 19 dev-only warning; component stack is 100% framework frames — verified
+// 2026-07-17, unchanged in expo-router 57.0.6). Upstream: expo/expo#35224,
+// software-mansion/react-native-screens#2876. Remove once fixed upstream.
+// App-code setState-in-render is still caught statically by the React Compiler lint.
+LogBox.ignoreLogs([/Can't perform a React state update on a component that hasn't mounted yet/]);
 
 const queryClient = new QueryClient();
 

@@ -97,6 +97,9 @@ Two terminals from the project root:
 
 ## M4 — Corners 💬
 
+- [x] **M4-start bug sweep (the two pre-existing dev issues)** *(2026-07-17)*:
+  (a) boot-time red LogBox "Can't perform a React state update on a component that hasn't mounted yet" — reproduced on cold boot, component stack is 100% framework frames (`ContextNavigator`→`ExpoRoot`→`App`): expo-router's async initial-URL resolution updates router-store state before ContextNavigator's first commit (React 19 dev-only warning; upstream expo/expo#35224, react-native-screens#2876; relevant files byte-identical in expo-router 57.0.6 so upgrading doesn't help). Fixed with a documented, precisely-matched `LogBox.ignoreLogs` in `src/app/_layout.tsx` (app-code setState-in-render is still caught statically by the React Compiler lint).
+  (b) couple-creation listener race — `createCouple`'s batch fires the local `users/{uid}` snapshot optimistically, so `CoupleProvider` attached the couple listener before the batch committed server-side → rules deny → **Firestore kills the listener permanently** → the app never heard `bulldog.name`, so the name-save spinner hung. Root fix: new `watchCouple()` in `src/features/couple/api.ts` — resubscribes with exponential backoff on permission-denied (6 tries from 400ms), reports `null` instead of hanging if access never materializes; `CoupleProvider` now uses it. TDD'd with 2 new emulator tests (listener-attached-before-create recovers; gives-up-cleanly) — 19/19. **Live-verified**: fresh account `racefix1@test.dev` → create world → name "Biscuit" → save navigated instantly to Biscuit's Den (the previously-hanging step), zero LogBox toasts the whole flow.
 - [ ] Corner grid: create, cover photo, emoji charms
 - [ ] Chat per corner (real-time, reactions)
 - [ ] Pins: photo / note / link, scrapbook positioning
