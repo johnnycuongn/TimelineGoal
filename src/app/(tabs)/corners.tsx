@@ -4,10 +4,10 @@
  */
 
 import { useRouter } from 'expo-router';
-import { MessagesSquare, Plus } from 'lucide-react-native';
+import { Plus } from 'lucide-react-native';
 import { FlatList, Pressable, StyleSheet, View } from 'react-native';
 
-import { Button } from '@/components/button';
+import { EmptyState } from '@/components/empty-state';
 import { Loading } from '@/components/loading';
 import { Screen } from '@/components/screen';
 import { Text } from '@/components/text';
@@ -29,12 +29,12 @@ export default function CornersScreen() {
   if (corners.length === 0) {
     return (
       <Screen center>
-        <MessagesSquare color={colors.primary} size={72} strokeWidth={2} />
         <Text variant="display">Corners</Text>
-        <Text variant="body" color="textSecondary" style={styles.center}>
-          A little corner for every plan we’re{'\n'}dreaming up together.
-        </Text>
-        <Button label="Open our first corner" onPress={() => router.push('/new-corner')} />
+        <EmptyState
+          message={'A little corner for every plan we’re dreaming up together.'}
+          cta="Open our first corner"
+          onPress={() => router.push('/new-corner')}
+        />
       </Screen>
     );
   }

@@ -225,6 +225,55 @@ export async function setBulldogName(
   await updateDoc(doc(db, COUPLES, coupleId), { 'bulldog.name': name.trim() });
 }
 
+/** Set (or change) the couple's anniversary. Either partner may. */
+export async function setAnniversary(
+  db: Firestore,
+  coupleId: string,
+  date: Date,
+): Promise<void> {
+  await updateDoc(doc(db, COUPLES, coupleId), { anniversary: date });
+}
+
+/**
+ * Leave the couple. The world is kept (data retained — see the design spec);
+ * the remaining partner can mint a fresh invite and the leaver can rejoin.
+ */
+export async function leaveCouple(
+  db: Firestore,
+  params: { coupleId: string; uid: string; members: string[] },
+): Promise<void> {
+  const { coupleId, uid, members } = params;
+  const batch = writeBatch(db);
+  batch.update(doc(db, COUPLES, coupleId), {
+    members: members.filter((m) => m !== uid),
+    [`partnerColors.${uid}`]: deleteField(),
+  });
+  batch.set(doc(db, USERS, uid), { coupleId: deleteField() }, { merge: true });
+  await batch.commit();
+}
+
+/**
+ * Mint a fresh invite for a 1-member couple (after a partner left, or the
+ * original code expired). Same shape as the code born with the couple.
+ */
+export async function mintInvite(
+  db: Firestore,
+  params: { coupleId: string; uid: string },
+): Promise<string> {
+  const { coupleId, uid } = params;
+  const code = await reserveUniqueCode(db);
+  const batch = writeBatch(db);
+  batch.set(doc(db, INVITES, code), {
+    coupleId,
+    createdBy: uid,
+    createdAt: serverTimestamp(),
+    expiresAt: Date.now() + INVITE_TTL_MS,
+  });
+  batch.update(doc(db, COUPLES, coupleId), { pendingInviteCode: code });
+  await batch.commit();
+  return code;
+}
+
 /** Cancel a pending invite (e.g. the creator wants a fresh code). */
 export async function revokeInvite(db: Firestore, code: string): Promise<void> {
   await deleteDoc(doc(db, INVITES, normalizeInviteCode(code)));

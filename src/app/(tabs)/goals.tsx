@@ -1,10 +1,10 @@
 import { useRouter } from 'expo-router';
-import { Dog } from 'lucide-react-native';
 import { useState } from 'react';
 import { Alert, FlatList, Pressable, StyleSheet, View } from 'react-native';
 import Animated, { FadeInDown, useReducedMotion } from 'react-native-reanimated';
 
 import { Button } from '@/components/button';
+import { EmptyState } from '@/components/empty-state';
 import { Screen } from '@/components/screen';
 import { Text } from '@/components/text';
 import { useCouple } from '@/features/couple/CoupleProvider';
@@ -106,11 +106,11 @@ export default function TimelineScreen() {
 
       {!loading && shown.length === 0 ? (
         <View style={styles.empty}>
-          <Dog color={colors.textSecondary} size={64} strokeWidth={1.75} />
-          <Text variant="bodyLarge" color="textSecondary" style={styles.center}>
-            {heading.empty}
-          </Text>
-          <Button label="Add our first goal" onPress={() => router.push('/new-goal')} />
+          <EmptyState
+            message={heading.empty}
+            cta="Add our first goal"
+            onPress={() => router.push('/new-goal')}
+          />
         </View>
       ) : (
         <FlatList

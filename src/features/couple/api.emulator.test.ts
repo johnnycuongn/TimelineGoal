@@ -15,7 +15,15 @@ import { resolve } from 'path';
 import { doc, getDoc, serverTimestamp, setDoc, type Firestore } from 'firebase/firestore';
 
 import type { Couple } from '@/lib/types';
-import { createCouple, joinCouple, PairingError, watchCouple } from './api';
+import {
+  createCouple,
+  joinCouple,
+  leaveCouple,
+  mintInvite,
+  PairingError,
+  setAnniversary,
+  watchCouple,
+} from './api';
 
 const PROJECT_ID = 'demo-timelinegoal';
 const ALICE = 'alice_uid';
@@ -103,6 +111,46 @@ describe('joinCouple', () => {
     await expect(
       joinCouple(asUser(CAROL), { uid: CAROL, code, partnerColor: GRAPE }),
     ).rejects.toBeInstanceOf(PairingError);
+  });
+});
+
+describe('us — anniversary, leave, re-invite', () => {
+  it('either partner sets the anniversary', async () => {
+    const { coupleId, code } = await createCouple(asUser(ALICE), {
+      uid: ALICE,
+      partnerColor: ROSE,
+    });
+    await joinCouple(asUser(BOB), { uid: BOB, code, partnerColor: TEAL });
+
+    await setAnniversary(asUser(BOB), coupleId, new Date('2024-02-14T00:00:00Z'));
+    const snap = await getDoc(doc(asUser(ALICE), 'couples', coupleId));
+    expect(snap.data()?.anniversary.toDate().toISOString()).toBe('2024-02-14T00:00:00.000Z');
+  });
+
+  it('a partner can leave (world kept), and the remaining partner re-invites', async () => {
+    const { coupleId, code } = await createCouple(asUser(ALICE), {
+      uid: ALICE,
+      partnerColor: ROSE,
+    });
+    await joinCouple(asUser(BOB), { uid: BOB, code, partnerColor: TEAL });
+
+    await leaveCouple(asUser(BOB), { coupleId, uid: BOB, members: [ALICE, BOB] });
+    let couple = await getDoc(doc(asUser(ALICE), 'couples', coupleId));
+    expect(couple.data()?.members).toEqual([ALICE]);
+    expect(couple.data()?.partnerColors[BOB]).toBeUndefined();
+    expect((await getDoc(doc(asUser(BOB), 'users', BOB))).data()?.coupleId).toBeUndefined();
+
+    // Alice mints a fresh code; Carol joins with it.
+    const fresh = await mintInvite(asUser(ALICE), { coupleId, uid: ALICE });
+    expect(fresh).toHaveLength(8);
+    const { coupleId: joined } = await joinCouple(asUser(CAROL), {
+      uid: CAROL,
+      code: fresh,
+      partnerColor: GRAPE,
+    });
+    expect(joined).toBe(coupleId);
+    couple = await getDoc(doc(asUser(CAROL), 'couples', coupleId));
+    expect(couple.data()?.members.sort()).toEqual([ALICE, CAROL].sort());
   });
 });
 
