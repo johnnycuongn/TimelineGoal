@@ -26,7 +26,8 @@ import {
 } from 'firebase/firestore';
 import { connectStorageEmulator, getStorage, type FirebaseStorage } from 'firebase/storage';
 
-// Public web config for the `timelinegoal` project.
+// Public web configs (safe to commit — the only real secret is a service-account
+// JSON, which never lives in the client).
 const prodConfig = {
   apiKey: 'AIzaSyCG_Z3mVFPm4k-waHuomlxMDjm8nP3ffcc',
   authDomain: 'timelinegoal.firebaseapp.com',
@@ -35,6 +36,35 @@ const prodConfig = {
   messagingSenderId: '1070162148867',
   appId: '1:1070162148867:web:220950bffc9a799f8e9836',
 } as const;
+
+const stagingConfig = {
+  apiKey: 'AIzaSyDR57rEKoHmZ3wEYSIxQhqlyqbZ_N1GlhE',
+  authDomain: 'timelinegoal-staging.firebaseapp.com',
+  projectId: 'timelinegoal-staging',
+  storageBucket: 'timelinegoal-staging.firebasestorage.app',
+  messagingSenderId: '342467977242',
+  appId: '1:342467977242:web:bc05e5365a9786fb5731a3',
+} as const;
+
+/**
+ * Which backend this build talks to. EAS build profiles pin it via
+ * EXPO_PUBLIC_FIREBASE_ENV (staging → TestFlight, production → App Store);
+ * local dev defaults to the emulator suite unless explicitly pointed away
+ * (EXPO_PUBLIC_USE_FIREBASE_EMULATORS=false → production, the old escape hatch).
+ */
+export type FirebaseEnv = 'emulators' | 'staging' | 'production';
+const FIREBASE_ENV: FirebaseEnv = (() => {
+  const explicit = process.env.EXPO_PUBLIC_FIREBASE_ENV as FirebaseEnv | undefined;
+  if (explicit === 'emulators' || explicit === 'staging' || explicit === 'production') {
+    return explicit;
+  }
+  if (__DEV__) {
+    return process.env.EXPO_PUBLIC_USE_FIREBASE_EMULATORS !== 'false'
+      ? 'emulators'
+      : 'production';
+  }
+  return 'production';
+})();
 
 /**
  * `getReactNativePersistence` exists ONLY in Firebase's React Native build (which Metro
@@ -59,9 +89,7 @@ const EMULATOR_HOST =
   Platform.select({ android: '10.0.2.2', default: 'localhost' }) ??
   'localhost';
 
-/** In dev, use emulators unless explicitly disabled. */
-const USE_EMULATORS =
-  __DEV__ && process.env.EXPO_PUBLIC_USE_FIREBASE_EMULATORS !== 'false';
+const USE_EMULATORS = FIREBASE_ENV === 'emulators';
 
 /**
  * Against the emulators, the app must live in the SAME project namespace the
@@ -77,7 +105,9 @@ const firebaseConfig = USE_EMULATORS
       authDomain: 'demo-timelinegoal.firebaseapp.com',
       storageBucket: 'demo-timelinegoal.appspot.com',
     }
-  : prodConfig;
+  : FIREBASE_ENV === 'staging'
+    ? stagingConfig
+    : prodConfig;
 
 const app = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
 
@@ -104,4 +134,4 @@ if (USE_EMULATORS && !emulatorsConnected) {
   connectStorageEmulator(storage, EMULATOR_HOST, 9199);
 }
 
-export { app, USE_EMULATORS };
+export { app, USE_EMULATORS, FIREBASE_ENV };
