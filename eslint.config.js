@@ -8,17 +8,12 @@ module.exports = defineConfig([
   {
     ignores: ['dist/*'],
   },
-  {
-    rules: {
-      // Reanimated shared values are mutated by design (`sv.value = x` inside
-      // effects/handlers is the documented v4 API); the React Compiler's
-      // immutability lint doesn't model them yet.
-      'react-hooks/immutability': 'off',
-      // Advisory only: the Firestore reset-then-subscribe idiom (clear state,
-      // then onSnapshot) trips this; the reset half is intentional.
-      'react-hooks/set-state-in-effect': 'warn',
-    },
-  },
+  // NOTE (sdk54 branch): the React-Compiler-era hook rules we tuned on SDK 57
+  // (react-hooks/immutability off, set-state-in-effect → warn, the refs rule)
+  // don't exist in eslint-plugin-react-hooks 5.x that SDK 54 ships — configuring
+  // them crashes ESLint, so the overrides are gone. The inline
+  // eslint-disable-next-line comments for those rules become "unused directive"
+  // warnings, which is fine.
   {
     // Jest suites — includes the plain-JS rules tests that run outside the app bundle.
     files: ['**/*.test.{js,ts,tsx}', 'jest.*.js'],

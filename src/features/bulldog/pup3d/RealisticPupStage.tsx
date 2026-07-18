@@ -708,7 +708,7 @@ export default function RealisticPupStage({
       .activeOffsetX([-12, 12])
       .failOffsetY([-14, 14])
       .runOnJS(true)
-      // eslint-disable-next-line react-hooks/refs -- gesture-handler onChange fires on touch events, never during render (compiler lint can't see through the RNGH builder)
+      // (React-Compiler refs lint on SDK 57 needed a disable here; the rule doesn't exist on SDK 54's plugin. Gesture-handler onChange fires on touch events, never during render.)
       .onChange((e) => {
         spin.current += e.changeX * 0.012;
       });

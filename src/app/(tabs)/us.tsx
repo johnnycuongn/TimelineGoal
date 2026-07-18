@@ -139,11 +139,10 @@ export default function UsScreen() {
             mode="date"
             display={Platform.OS === 'ios' ? 'spinner' : 'default'}
             maximumDate={new Date()}
-            onValueChange={(_event, date) => {
+            onChange={(event, date) => {
               if (Platform.OS !== 'ios') setShowPicker(false);
-              if (date) void saveAnniversary(date);
+              if (event.type === 'set' && date) void saveAnniversary(date);
             }}
-            onDismiss={() => setShowPicker(false)}
           />
         ) : null}
 
