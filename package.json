@@ -74,7 +74,8 @@
     "test": "jest",
     "test:watch": "jest --watch",
     "test:emulator": "firebase emulators:exec --only firestore,storage --project demo-timelinegoal \"jest --config jest.emulator.config.js --runInBand\"",
-    "emulators": "firebase emulators:start --project demo-timelinegoal"
+    "emulators": "firebase emulators:start --project demo-timelinegoal",
+    "start:staging": "EXPO_PUBLIC_FIREBASE_ENV=staging expo start --go"
   },
   "jest": {
     "preset": "jest-expo",

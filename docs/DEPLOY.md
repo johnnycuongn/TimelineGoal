@@ -64,6 +64,32 @@ Any free Expo account works (the old `duccuong0810` login was stale — fresh lo
 
 ---
 
+## Free iPhone testing against staging (no Apple Developer Program)
+
+Two options, both free — do the staging console clicks (section A) first:
+
+1. **Expo Go + staging server** (easiest; Mac must run the server, same Wi-Fi):
+   ```bash
+   git checkout sdk54-expo-go     # the branch Expo Go 54 can run
+   npm run start:staging          # dev server pointed at timelinegoal-staging
+   ```
+   Open it in Expo Go on the iPhone (exp://<Mac LAN IP>:8081). Real staging
+   data, real 3D pup, both partners can join over the same Wi-Fi.
+
+2. **Free Apple ID cable build** (standalone on the phone, ~7-day signing):
+   ```bash
+   git checkout master            # standalone builds don't need Expo Go → SDK 57 fine
+   EXPO_PUBLIC_FIREBASE_ENV=staging npx expo run:ios --device --configuration Release
+   ```
+   Phone plugged in via cable; Xcode signs with your free Apple ID (add it in
+   Xcode → Settings → Accounts; trust the profile on the phone under
+   Settings → General → VPN & Device Management). The app then runs WITHOUT
+   the Mac — it expires after ~7 days, re-run to re-sign. No push notifications
+   on free accounts.
+
+TestFlight (section below) is the paid, polished version of option 2 —
+no expiry, no cable, both phones, push works.
+
 ## Ship to TestFlight (staging)
 
 From `master`, after A–C are done:
