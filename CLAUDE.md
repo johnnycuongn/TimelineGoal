@@ -17,7 +17,11 @@ Greenfield — design phase complete, implementation not started. **Before any i
 
 **Product values (non-negotiable)**: cuteness, fun, simplicity, interactivity. Every feature should be judged against "is this enjoyable for a couple to use together?"
 
-## ⚠️ Expo SDK 57 — read versioned docs first
+## ⚠️ THIS BRANCH (`sdk54-expo-go`) RUNS EXPO SDK 54
+
+**`master` is SDK 57; this branch is downgraded to SDK 54** (2026-07-18) because the App Store's Expo Go tops out at SDK 54 and the user tests on a physical iPhone. On this branch: RN 0.81.5, React 19.1, expo-router 6, Reanimated 4.1, TS 5.9 — read https://docs.expo.dev/versions/v54.0.0/ here, and note the datetimepicker uses the 8.x `onChange` API and eslint has no React-Compiler hook rules. Merge/abandon when Expo Go 57 ships to stores. The section below describes `master`.
+
+## ⚠️ Expo SDK 57 (master) — read versioned docs first
 
 This project runs **Expo SDK 57** (React Native 0.86, React 19.2, Reanimated **4.5** + react-native-worklets, TypeScript 6, New Architecture). SDK 57 post-dates most training data — **before writing Expo/Reanimated/Router code, read the exact versioned docs at https://docs.expo.dev/versions/v57.0.0/** (this is also the standing order in `AGENTS.md`). Notably: Reanimated is **v4** (worklets live in `react-native-worklets`, not the reanimated package; requires New Arch), and app code lives under **`src/app/`** (Expo Router, typed routes + React Compiler enabled in `app.json`).
 
