@@ -21,7 +21,6 @@ import {
   weeklyStreak,
 } from '@/features/goals/ladder';
 import { quarterPeriod, weekPeriod, yearPeriod } from '@/features/goals/period';
-import { PulseRing } from '@/features/goals/PulseRing';
 import { StreakDoodles } from '@/features/goals/StreakDoodles';
 import { Ticker } from '@/features/goals/Ticker';
 import { haptics, radius, spacing, useTheme } from '@/theme';
@@ -89,12 +88,6 @@ export default function DenScreen() {
   const weeklyGoals = goalsForPeriod(goals, 'week', thisWeek);
   const strip = weeklyGoals.slice(0, 4);
 
-  // Weekly pulse: both partners fill the ring from opposite ends.
-  const pulse = weeklyPulse(goals, thisWeek, couple.members);
-  const [uidA, uidB] = couple.members;
-  const fractionOf = (uid?: string) =>
-    pulse.targetTotal > 0 && uid ? (pulse.byUid[uid] ?? 0) / pulse.targetTotal : 0;
-
   // Streak doodles on the den wall.
   const streak = weeklyStreak(completedWeeks(goals), thisWeek);
 
@@ -109,17 +102,10 @@ export default function DenScreen() {
         <View style={styles.hero}>
           <View style={styles.pupWall}>
             <StreakDoodles streak={streak} size={130} />
-            <PulseRing
-              size={164}
-              fractionA={fractionOf(uidA)}
-              fractionB={fractionOf(uidB)}
-              colorA={couple.partnerColors[uidA] ?? colors.primary}
-              colorB={(uidB && couple.partnerColors[uidB]) || colors.secondary}>
-              {/* The realistic 3D pup IS the bulldog now (transparent GL canvas
-                  sits inside the pulse ring; SVG Mochi remains in onboarding).
-                  Rigged edition: real skeletal dog animations. */}
-              <RiggedPupStage width={140} height={140} showHint={false} />
-            </PulseRing>
+            {/* The realistic 3D pup IS the bulldog — free-roaming, no enclosing
+                ring (user request 2026-07-18; the weekly-pulse ring mechanic is
+                parked, weeklyPulse data still powers goal cards). */}
+            <RiggedPupStage width={320} height={210} showHint={false} />
           </View>
           <Text variant="title">{bulldogName}’s Den</Text>
           <Text variant="caption" color="textSecondary">

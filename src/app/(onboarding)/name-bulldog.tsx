@@ -5,7 +5,7 @@ import { Button } from '@/components/button';
 import { Screen } from '@/components/screen';
 import { Text } from '@/components/text';
 import { TextField } from '@/components/text-field';
-import { BulldogView } from '@/features/bulldog/BulldogView';
+import RiggedPupStage from '@/features/bulldog/pup3d/RiggedPupStage';
 import { useCouple } from '@/features/couple/CoupleProvider';
 import { setBulldogName } from '@/features/couple/api';
 import { db } from '@/lib/firebase';
@@ -42,7 +42,7 @@ export default function NameBulldogScreen() {
         style={styles.flex}>
         <View style={styles.body}>
           <View style={styles.hero}>
-            <BulldogView size={132} />
+            <RiggedPupStage width={200} height={170} showHint={false} />
             <Text variant="title">Meet your bulldog</Text>
             <Text variant="body" color="textSecondary" style={styles.center}>
               This little one cheers you both on. What’s their name?

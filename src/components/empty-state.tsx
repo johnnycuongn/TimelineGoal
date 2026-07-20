@@ -1,15 +1,15 @@
 /**
- * EmptyState — Mochi holding a little sign (see .claude/skills/cuteness:
+ * EmptyState — the 3D pup holding a little sign (see .claude/skills/cuteness:
  * "empty states have character: bulldog holds a sign, never a bare No data").
- * SVG Mochi keeps breathing/blinking via the shared mood store, the sign hangs
- * at a sticker tilt, and there's always a warm next step.
+ * The rigged pup stays alive via the shared mood store, the sign hangs at a
+ * sticker tilt, and there's always a warm next step.
  */
 
 import { StyleSheet, View } from 'react-native';
 
 import { Button } from '@/components/button';
 import { Text } from '@/components/text';
-import { BulldogView } from '@/features/bulldog/BulldogView';
+import RiggedPupStage from '@/features/bulldog/pup3d/RiggedPupStage';
 import { elevation, radius, spacing, useTheme } from '@/theme';
 
 interface EmptyStateProps {
@@ -24,7 +24,7 @@ export function EmptyState({ message, cta, onPress }: EmptyStateProps) {
   const { colors } = useTheme();
   return (
     <View style={styles.wrap}>
-      <BulldogView size={116} />
+      <RiggedPupStage width={180} height={150} showHint={false} />
       <View
         style={[
           styles.sign,

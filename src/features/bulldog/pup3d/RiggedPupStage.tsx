@@ -23,6 +23,7 @@
  */
 /* eslint-disable react/no-unknown-property -- react-three-fiber JSX sets three.js object properties */
 
+import { useIsFocused } from '@react-navigation/native';
 import { useAnimations, useGLTF } from '@react-three/drei/native';
 import { Canvas, useFrame, useThree } from '@react-three/fiber/native';
 import * as Device from 'expo-device';
@@ -72,7 +73,8 @@ function StudioLighting() {
     const pmrem = new PMREMGenerator(gl);
     const rt = pmrem.fromScene(new RoomEnvironment(), 0.04);
     scene.environment = rt.texture;
-    scene.environmentIntensity = 0.9;
+    // Slightly hot IBL — the user asked for a lighter coat than the raw scan.
+    scene.environmentIntensity = 1.2;
     return () => {
       scene.environment = null;
       rt.dispose();
@@ -110,7 +112,17 @@ function PuppyModel({ spin }: { spin: MutableRefObject<number> }) {
     gltf.scene.position.set(0, 0, 0);
     g.updateWorldMatrix(true, true);
     gltf.scene.traverse((obj) => {
-      if ((obj as Mesh).isMesh) (obj as Mesh).castShadow = true;
+      const mesh = obj as Mesh;
+      if (mesh.isMesh) {
+        mesh.castShadow = true;
+        // Gentle coat lift (fur reads a touch dark under ACES): multiply the
+        // albedo above 1 — tonemapping keeps it from clipping.
+        const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+        for (const mat of mats) {
+          const std = mat as { color?: { setScalar: (v: number) => void } };
+          std.color?.setScalar(1.12);
+        }
+      }
     });
     const box = new Box3().setFromObject(gltf.scene);
     const size = box.getSize(new Vector3());
@@ -223,6 +235,11 @@ export default function RiggedPupStage({
 }) {
   const trigger = useBulldogStore((s) => s.trigger);
   const spin = useRef(HERO_ANGLE);
+  // ONE live GL context at a time: a canvas on an unfocused screen (previous
+  // stack entry, hidden tab) starves the focused one on Android Expo Go —
+  // the new screen's pup renders nothing. Unmount when not focused (also
+  // saves battery; remount auto-frames again).
+  const isFocused = useIsFocused();
 
   const gestures = useMemo(() => {
     const pan = Gesture.Pan()
@@ -243,6 +260,10 @@ export default function RiggedPupStage({
   }, [trigger]);
 
   const frame = width != null ? { height, width, alignSelf: 'center' as const } : { height };
+
+  if (!isFocused) {
+    return <View style={[styles.wrap, frame]} />;
+  }
 
   if (Platform.OS === 'ios' && !Device.isDevice) {
     return (
@@ -267,7 +288,7 @@ export default function RiggedPupStage({
         <StudioLighting />
         <directionalLight
           position={[2.2, 4, 2.8]}
-          intensity={1.5}
+          intensity={1.75}
           color="#fff1e0"
           castShadow
           shadow-mapSize={[1024, 1024]}
