@@ -1,7 +1,9 @@
-import { Heart, Home, Mountain, PawPrint } from "lucide-react";
-import type { ReactNode } from "react";
+import { Heart, Home, LogOut, Mountain, PawPrint } from "lucide-react";
+import { type ReactNode, useCallback } from "react";
 import { NavLink, Outlet } from "react-router";
+import { useAuth } from "@/auth/auth-provider";
 import ThemeToggle from "@/components/theme-toggle";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 export const NAV = [
@@ -18,6 +20,21 @@ function tabClass({ isActive }: { isActive: boolean }): string {
   return cn(
     "flex min-h-11 flex-1 flex-col items-center justify-center gap-0.5 rounded-2xl text-xs font-semibold",
     isActive ? "text-primary" : "text-muted-foreground",
+  );
+}
+
+function SignOutButton() {
+  const { status, signOut } = useAuth();
+  const onClick = useCallback(() => {
+    void signOut();
+  }, [signOut]);
+  if (status !== "signed-in") {
+    return null;
+  }
+  return (
+    <Button aria-label="Sign out" onClick={onClick} size="icon" type="button" variant="ghost">
+      <LogOut className="size-5" />
+    </Button>
   );
 }
 
@@ -48,7 +65,8 @@ export default function AppShell({
               ))}
             </div>
           ) : null}
-          <div className="ml-auto flex items-center gap-1">
+          <div className="ml-auto flex items-center gap-2">
+            <SignOutButton />
             {right}
             <ThemeToggle />
           </div>
