@@ -1,0 +1,194 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+/* CoupleGoal tokens. Semantic only; components never use raw hex. */
+:root {
+  --radius: 1.25rem;
+  --background: #fdf2f8;
+  --foreground: #0f172a;
+  --card: #ffffff;
+  --card-foreground: #0f172a;
+  --popover: #ffffff;
+  --popover-foreground: #0f172a;
+  --primary: #be185d;
+  --primary-foreground: #ffffff;
+  --secondary: #ec4899;
+  --secondary-foreground: #ffffff;
+  --muted: #fbf1f5;
+  --muted-foreground: #6b5561;
+  --accent: #fbf1f5;
+  --accent-foreground: #0f172a;
+  --destructive: #dc2626;
+  --success: #15803d;
+  --border: #f7e3eb;
+  --input: #f7e3eb;
+  --ring: #be185d;
+  --tab-bar-height: 4.25rem;
+}
+
+/* Dark: desaturated rose, not inverted. */
+.dark {
+  --background: #181015;
+  --foreground: #f6e9ef;
+  --card: #241820;
+  --card-foreground: #f6e9ef;
+  --popover: #241820;
+  --popover-foreground: #f6e9ef;
+  --primary: #f472b6;
+  --primary-foreground: #3b0a22;
+  --secondary: #f9a8d4;
+  --secondary-foreground: #3b0a22;
+  --muted: #2e1f28;
+  --muted-foreground: #c8aab8;
+  --accent: #2e1f28;
+  --accent-foreground: #f6e9ef;
+  --destructive: #f87171;
+  --success: #4ade80;
+  --border: #3d2a34;
+  --input: #3d2a34;
+  --ring: #f472b6;
+}
+
+@theme inline {
+  --font-sans: "Nunito", ui-sans-serif, system-ui, sans-serif;
+  --font-heading: "Fredoka", "Nunito", ui-sans-serif, system-ui, sans-serif;
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-success: var(--success);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --radius-sm: calc(var(--radius) - 8px);
+  --radius-md: calc(var(--radius) - 4px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  html,
+  body {
+    overflow-x: clip;
+  }
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+    min-height: 100dvh;
+    font-size: 16px;
+    line-height: 1.5;
+    overflow-wrap: anywhere;
+  }
+  h1,
+  h2,
+  h3,
+  h4 {
+    @apply font-heading;
+    font-style: normal;
+  }
+  input,
+  select,
+  textarea {
+    font-size: 16px; /* iOS Safari zooms on focus below 16px */
+  }
+  img,
+  canvas {
+    max-width: 100%;
+    height: auto;
+  }
+}
+
+@layer components {
+  .page-wrap {
+    @apply mx-auto w-full max-w-5xl;
+  }
+  .island-shell {
+    @apply rounded-[var(--radius-xl)] border border-border bg-card shadow-[0_10px_30px_-18px_rgb(190_24_93/0.35)];
+  }
+  .island-kicker {
+    @apply font-heading text-primary text-xs font-semibold uppercase tracking-[0.18em];
+  }
+  .display-title {
+    @apply font-heading font-semibold tracking-[-0.01em];
+    text-wrap: balance;
+  }
+  .nav-link {
+    @apply relative inline-flex min-h-11 items-center px-1 text-muted-foreground no-underline;
+  }
+  .nav-link::after {
+    content: "";
+    @apply absolute inset-x-1 bottom-2 h-0.5 origin-left scale-x-0 rounded-full bg-primary transition-transform;
+  }
+  .nav-link.is-active {
+    @apply text-foreground;
+  }
+  .nav-link.is-active::after {
+    @apply scale-x-100;
+  }
+  @media (hover: hover) {
+    .nav-link:hover {
+      @apply text-foreground;
+    }
+  }
+  /* Room for the fixed tab bar on phones. */
+  .with-tab-bar {
+    padding-bottom: calc(var(--tab-bar-height) + env(safe-area-inset-bottom) + 1rem);
+  }
+  @media (min-width: 768px) {
+    .with-tab-bar {
+      padding-bottom: 3rem;
+    }
+  }
+  .tab-bar {
+    padding-bottom: env(safe-area-inset-bottom);
+    height: calc(var(--tab-bar-height) + env(safe-area-inset-bottom));
+  }
+  .safe-top {
+    padding-top: env(safe-area-inset-top);
+  }
+  /* Dialogs become bottom sheets on phones. */
+  @media (max-width: 639px) {
+    [data-slot="dialog-content"] {
+      top: auto;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      transform: none;
+      width: 100%;
+      max-width: 100%;
+      max-height: 90dvh;
+      overflow-y: auto;
+      border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+      padding-bottom: calc(1.5rem + env(safe-area-inset-bottom));
+    }
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    /* biome-ignore lint/complexity/noImportantStyles: reduced motion must win over every animation */
+    animation-duration: 0.01ms !important;
+    /* biome-ignore lint/complexity/noImportantStyles: reduced motion must win over every transition */
+    transition-duration: 0.01ms !important;
+  }
+}
