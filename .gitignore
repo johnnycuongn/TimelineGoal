@@ -9,3 +9,5 @@ dev-dist
 .playwright-mcp
 *.local
 .superpowers/
+*.pem
+.dev.vars
