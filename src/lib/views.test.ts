@@ -47,7 +47,14 @@ const data: CoupleData = {
     { id: B, displayName: "Bo", color: "teal" },
   ],
   goals: [
-    goal({ id: "walk", horizon: "day", owner: "shared" }),
+    // Shared, and so autosealed by its creator: goals_autoseal fires for every
+    // shared goal, whatever its horizon, so a zero-seal shared row cannot exist.
+    goal({
+      id: "walk",
+      horizon: "day",
+      owner: "shared",
+      seals: { [A]: "2026-09-01T00:00:00.000Z" },
+    }),
     goal({ id: "old", horizon: "day", archivedAt: "2026-09-02T00:00:00.000Z" }),
     goal({
       id: "m",
@@ -82,6 +89,23 @@ describe("denView", () => {
 
   test("a creator has nothing waiting for their seal", () => {
     expect(denView(data, A, "2026-09-17").waitingForMySeal).toEqual([]);
+  });
+
+  test("a shared habit is stamped, never sealed, so it never waits", () => {
+    // `walk` is shared and carries only A's autoseal, so B has not sealed it — yet B
+    // is never asked to press wax on a habit, because the day tab offers no seal.
+    expect(data.goals[0]?.seals[B]).toBeUndefined();
+    expect(denView(data, B, "2026-09-17").waitingForMySeal.map((g) => g.id)).toEqual(["m"]);
+  });
+
+  test("a milestone both have sealed waits for nobody", () => {
+    const sealed: CoupleData = {
+      ...data,
+      goals: data.goals.map((g) =>
+        g.id === "m" ? { ...g, seals: { ...g.seals, [B]: "2026-09-02T00:00:00.000Z" } } : g,
+      ),
+    };
+    expect(denView(sealed, B, "2026-09-17").waitingForMySeal).toEqual([]);
   });
 });
 

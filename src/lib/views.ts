@@ -70,10 +70,11 @@ export function denView(data: CoupleData, me: string, today: string): DenData {
       data.members.map((m) => m.id),
     ),
     ticker,
-    // A shared goal always carries its creator's seal (goals_autoseal), so one with
-    // no seals at all is waiting for nobody.
+    // The wax is a milestone ritual: only milestone cards offer a seal, so a shared
+    // habit would sit here forever with nothing to press. The goals_autoseal trigger
+    // records the creator's seal, so whoever made the goal never waits on themselves.
     waitingForMySeal: goals.filter(
-      (g) => g.owner === SHARED_OWNER && !g.seals[me] && Object.keys(g.seals).length > 0,
+      (g) => g.owner === SHARED_OWNER && g.horizon !== "day" && !g.seals[me],
     ),
     lastCheckInAt: data.checkins[0]?.at ?? null,
     todayCount: data.checkins.filter((c) => c.day === today).length,
