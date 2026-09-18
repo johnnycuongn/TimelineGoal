@@ -6,7 +6,7 @@ const key = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
 if (!(url && key)) {
   throw new Error(
-    "Missing VITE_SUPABASE_URL or VITE_SUPABASE_PUBLISHABLE_KEY. Copy .env.example to .env.local and fill both in."
+    "Missing VITE_SUPABASE_URL or VITE_SUPABASE_PUBLISHABLE_KEY. Copy .env.example to .env.local and fill both in.",
   );
 }
 
