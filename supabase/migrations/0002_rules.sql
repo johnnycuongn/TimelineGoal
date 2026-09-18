@@ -51,7 +51,8 @@ begin
     raise exception 'The owner must be in this den.';
   end if;
 
-  parent_changed := tg_op = 'INSERT' or new.parent_goal_id is distinct from old.parent_goal_id;
+  parent_changed := tg_op = 'INSERT' or new.parent_goal_id is distinct from old.parent_goal_id
+    or new.horizon is distinct from old.horizon or new.period is distinct from old.period;
   if new.parent_goal_id is not null and parent_changed then
     select * into parent from public.goals where id = new.parent_goal_id;
     up := public.parent_horizon(new.horizon);
