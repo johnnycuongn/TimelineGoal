@@ -55,7 +55,12 @@ export async function updateCouple(
 ): Promise<void> {
   const row: { pup_name?: string; anniversary?: string | null } = {};
   if (patch.pupName !== undefined) {
-    row.pup_name = patch.pupName.trim();
+    const pupName = patch.pupName.trim();
+    // couples.pup_name has a length check; refuse here so nothing is written.
+    if (pupName.length === 0) {
+      throw new Error("Your pup needs a name.");
+    }
+    row.pup_name = pupName;
   }
   if (patch.anniversary !== undefined) {
     row.anniversary = patch.anniversary;
@@ -72,7 +77,12 @@ export async function updateMember(
 ): Promise<void> {
   const row: { display_name?: string; color?: string } = {};
   if (patch.displayName !== undefined) {
-    row.display_name = patch.displayName.trim();
+    const displayName = patch.displayName.trim();
+    // members.display_name has a length check; refuse here so nothing is written.
+    if (displayName.length === 0) {
+      throw new Error("Your name can't be empty.");
+    }
+    row.display_name = displayName;
   }
   if (patch.color !== undefined) {
     row.color = patch.color;

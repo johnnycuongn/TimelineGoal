@@ -1,6 +1,7 @@
 const NETWORK_COPY = "We couldn't reach the den. Check your connection and try again.";
 const DEFAULT_COPY = "That didn't land. Try again?";
 const DUPLICATE_CODE = "23505";
+const CHECK_VIOLATION = "23514";
 
 interface ErrorLike {
   message?: unknown;
@@ -16,6 +17,10 @@ export function friendlyError(error: unknown): string {
   const e = (error ?? {}) as ErrorLike;
   if (e.code === DUPLICATE_CODE) {
     return "Already stamped.";
+  }
+  // A check constraint tripped. Never show Postgres' own wording for these.
+  if (e.code === CHECK_VIOLATION) {
+    return "That didn't fit. Have another look and try again?";
   }
   if (typeof e.message === "string" && e.message.length > 0) {
     if (e.message === "Failed to fetch") {

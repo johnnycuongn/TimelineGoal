@@ -24,6 +24,20 @@ export function isPartnerColorKey(value: string): value is PartnerColorKey {
   return value in PARTNER_COLORS;
 }
 
+function isNameWithin(value: string, max: number): boolean {
+  const trimmed = value.trim();
+  return trimmed.length > 0 && trimmed.length <= max;
+}
+
+/**
+ * True when both names on the Us form are ones the database will accept.
+ * `couples.pup_name` and `members.display_name` both carry length checks, so an
+ * empty field has to be caught before the save, not after.
+ */
+export function denNamesReady(pupName: string, displayName: string): boolean {
+  return isNameWithin(pupName, PUP_NAME_MAX) && isNameWithin(displayName, DISPLAY_NAME_MAX);
+}
+
 /** `owner` on a Goal is a member id or this sentinel. */
 export const SHARED_OWNER = "shared";
 export const GOAL_TITLE_MAX = 80;

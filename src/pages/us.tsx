@@ -10,8 +10,16 @@ import { Label } from "@/components/ui/label";
 import { useDen } from "@/data/den-context";
 import { mintInviteCode, updateCouple, updateMember } from "@/data/mutations";
 import { localDayKey } from "@/lib/day";
-import { DISPLAY_NAME_MAX, MAX_MEMBERS, type PartnerColorKey, PUP_NAME_MAX } from "@/lib/domain";
+import {
+  DISPLAY_NAME_MAX,
+  denNamesReady,
+  MAX_MEMBERS,
+  type PartnerColorKey,
+  PUP_NAME_MAX,
+} from "@/lib/domain";
 import { daysBetween } from "@/lib/periods";
+
+const NAMES_NEEDED = "Your pup and you both need a name before we can save.";
 
 export default function UsPage() {
   const { me, refresh } = useDen();
@@ -41,9 +49,18 @@ export default function UsPage() {
   const onSubmit = useCallback(
     (event: FormEvent) => {
       event.preventDefault();
+      // Both columns carry length checks, and the two writes are not one
+      // transaction: check before either of them so a save never half-applies.
+      if (!denNamesReady(pupName, displayName)) {
+        toast.error(NAMES_NEEDED);
+        return;
+      }
       void save(async () => {
-        await updateCouple(couple.id, { pupName, anniversary: anniversary || null });
-        await updateMember(me.userId, { displayName });
+        await updateCouple(couple.id, {
+          pupName: pupName.trim(),
+          anniversary: anniversary || null,
+        });
+        await updateMember(me.userId, { displayName: displayName.trim() });
       }, "Saved");
     },
     [save, couple.id, pupName, anniversary, me.userId, displayName],
@@ -80,6 +97,7 @@ export default function UsPage() {
     return null;
   }
 
+  const namesReady = denNamesReady(pupName, displayName);
   const daysOfUs = couple.anniversary ? daysBetween(couple.anniversary, localDayKey()) : null;
   const taken = me.members.filter((m) => m.id !== self.id).map((m) => m.color);
 
@@ -101,7 +119,13 @@ export default function UsPage() {
           <form className="grid gap-4 sm:grid-cols-2" onSubmit={onSubmit}>
             <div className="space-y-2">
               <Label htmlFor="pup">Pup name</Label>
-              <Input id="pup" maxLength={PUP_NAME_MAX} onChange={onPupName} value={pupName} />
+              <Input
+                id="pup"
+                maxLength={PUP_NAME_MAX}
+                onChange={onPupName}
+                required
+                value={pupName}
+              />
             </div>
             <div className="space-y-2">
               <Label htmlFor="me">Your name</Label>
@@ -109,6 +133,7 @@ export default function UsPage() {
                 id="me"
                 maxLength={DISPLAY_NAME_MAX}
                 onChange={onDisplayName}
+                required
                 value={displayName}
               />
             </div>
@@ -117,10 +142,13 @@ export default function UsPage() {
               <Input id="anniversary" onChange={onAnniversary} type="date" value={anniversary} />
             </div>
             <div className="flex items-end">
-              <Button className="w-full sm:w-auto" disabled={busy} type="submit">
+              <Button className="w-full sm:w-auto" disabled={busy || !namesReady} type="submit">
                 Save
               </Button>
             </div>
+            {namesReady ? null : (
+              <p className="text-muted-foreground text-sm sm:col-span-2">{NAMES_NEEDED}</p>
+            )}
           </form>
         </CardContent>
       </Card>
