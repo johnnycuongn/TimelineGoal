@@ -24,13 +24,19 @@ class StageBoundary extends Component<{ fallback: ReactNode; children: ReactNode
 // R3F builds the renderer inside a floating promise (Canvas's `run()` is async and
 // is called un-awaited), so a failed WebGL context surfaces as an unhandled
 // rejection that no error boundary can see. Probe once up front instead.
+//
+// three 0.186's WebGLRenderer only ever asks for a "webgl2" context, so this
+// probe must ask for exactly that: a browser with WebGL 1 but no WebGL 2 (the
+// flag disabled, a locked-down policy, an old WebView) would otherwise pass the
+// probe and then fail renderer construction, leaving the silent empty canvas
+// this probe exists to prevent.
 let webglOk: boolean | null = null;
 
 function supportsWebGL(): boolean {
   if (webglOk === null) {
     try {
       const probe = document.createElement("canvas");
-      const gl = probe.getContext("webgl2") ?? probe.getContext("webgl");
+      const gl = probe.getContext("webgl2");
       gl?.getExtension("WEBGL_lose_context")?.loseContext();
       webglOk = gl !== null;
     } catch {

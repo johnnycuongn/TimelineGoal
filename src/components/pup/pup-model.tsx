@@ -149,6 +149,9 @@ export default function PupModel({ reducedMotion }: { reducedMotion: boolean }) 
   // biome-ignore lint/correctness/useExhaustiveDependencies: `nonce` re-runs the effect for a repeat of the same mood
   useEffect(() => {
     if (reducedMotion) {
+      // Nothing will play, so close any transient mood now rather than leaving
+      // it to a clip that never runs (the provider's bound is the backstop).
+      settle();
       // Bake Idle's first frame into the bones, then freeze.
       clearIdleTimer();
       mixer.stopAllAction();
