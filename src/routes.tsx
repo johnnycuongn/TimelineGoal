@@ -51,12 +51,17 @@ function RequireDen() {
 /** Landing and login: a signed-in visitor goes straight to their den (or to pairing). */
 function SignedOutOnly() {
   const { status } = useAuth();
-  const { me, isLoading } = useMe();
-  if (status === "loading" || (status === "signed-in" && (isLoading || !me))) {
-    return <Loading />;
-  }
+  const { me, error, isLoading } = useMe();
+  // Data first: a stale SWR error alongside usable data must not block the redirect.
   if (status === "signed-in" && me) {
     return <Navigate replace to={me.couple ? "/den" : "/pair"} />;
+  }
+  // A failed who-am-I must not leave the PWA start URL on an endless skeleton.
+  if (status === "signed-in" && error) {
+    return <ErrorPanel error={error} />;
+  }
+  if (status === "loading" || (status === "signed-in" && (isLoading || !me))) {
+    return <Loading />;
   }
   return <Outlet />;
 }
