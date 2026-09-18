@@ -6,6 +6,8 @@ import { DenContext, type DenValue } from "@/data/den-context";
 import { useMe } from "@/data/use-me";
 import LandingPage from "@/pages/landing";
 import LoginPage from "@/pages/login";
+import PairPage from "@/pages/pair";
+import UsPage from "@/pages/us";
 
 function Loading() {
   return (
@@ -90,7 +92,7 @@ export const router = createBrowserRouter([
           },
           {
             element: <RequireSession />,
-            children: [{ path: "/pair", element: <Placeholder title="Pair" /> }],
+            children: [{ path: "/pair", element: <PairPage /> }],
           },
         ],
       },
@@ -105,7 +107,7 @@ export const router = createBrowserRouter([
                 children: [
                   { path: "/den", element: <Placeholder title="Den" /> },
                   { path: "/goals", element: <Placeholder title="Timeline" /> },
-                  { path: "/us", element: <Placeholder title="Us" /> },
+                  { path: "/us", element: <UsPage /> },
                 ],
               },
             ],
