@@ -41,7 +41,11 @@ the first deployment of a fresh project as going public, whatever the command lo
 After that, `vercel` with no target is a preview.
 
 Env vars on the project: `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY` (production
-and preview). `vercel.json` rewrites every route to `index.html`, caches `/models/*` for a
+and preview) and `CRON_SECRET` (production). `CRON_SECRET` is what `/api/keepalive` checks
+the `Authorization: Bearer …` header against — Vercel Cron sends it on its own, and without
+it the endpoint returns 500 rather than pinging Supabase. Generate it without ever printing
+it: `openssl rand -hex 32 | vercel env add CRON_SECRET production`; `vercel env ls` lists
+the names. `vercel.json` rewrites every route to `index.html`, caches `/models/*` for a
 year, and schedules `/api/keepalive` every third day. Cron jobs are attached to production
 deployments only, so a preview never pings Supabase; `vercel crons ls` shows the schedule.
 
