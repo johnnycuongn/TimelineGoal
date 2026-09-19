@@ -30,7 +30,24 @@ Two accounts are needed to try pairing: sign up twice (any email; confirmations 
 
 ## Deploy
 
-`vercel` for a preview, `vercel --prod` for production. Env vars on the project: `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY` (production and preview). `vercel.json` rewrites every route to `index.html`, caches `/models/*` for a year, and schedules `/api/keepalive` every third day.
+    vercel deploy --target=preview   # a preview URL; nothing becomes public
+    vercel --prod                    # the public production URL
+
+Deploying is the owner's decision, so prefer the explicit target over a bare `vercel`. On
+a **brand-new** Vercel project there is nothing to preview against and the CLI promotes
+the first deployment to production on its own — *"this is the project's first deployment,
+so it was assigned to production"* — which publishes the URL and starts the cron. Treat
+the first deployment of a fresh project as going public, whatever the command looks like.
+After that, `vercel` with no target is a preview.
+
+Env vars on the project: `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY` (production
+and preview). `vercel.json` rewrites every route to `index.html`, caches `/models/*` for a
+year, and schedules `/api/keepalive` every third day. Cron jobs are attached to production
+deployments only, so a preview never pings Supabase; `vercel crons ls` shows the schedule.
+
+The project is linked as `couplegoal` under the owner's personal scope (`vercel ls
+couplegoal` for its URLs). `vercel remove couplegoal` deletes the project and with it the
+public URL and the cron.
 
 ## Free tiers and what happens at the caps (checked Sep 2026)
 
