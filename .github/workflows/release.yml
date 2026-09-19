@@ -1,0 +1,92 @@
+# Publishing is deliberate: it takes a tag. `git tag v0.2.0 && git push --tags`
+# verifies the tagged commit, builds it with the production environment, moves
+# couplegoal-navy.vercel.app onto it, proves the site is answering, and writes
+# the release notes.
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+# Two releases must never race for the production alias, and a half-finished one
+# must never be cancelled mid-flight.
+concurrency:
+  group: production
+  cancel-in-progress: false
+
+env:
+  PROD_URL: https://couplegoal-navy.vercel.app
+
+jobs:
+  verify:
+    uses: ./.github/workflows/verify.yml
+
+  publish:
+    name: Publish to production
+    needs: verify
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      VERCEL_ORG_ID: ${{ vars.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ vars.VERCEL_PROJECT_ID }}
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - name: Require the Vercel credentials
+        run: |
+          missing=""
+          [ -z "$VERCEL_TOKEN" ] && missing="$missing VERCEL_TOKEN(secret)"
+          [ -z "$VERCEL_ORG_ID" ] && missing="$missing VERCEL_ORG_ID(variable)"
+          [ -z "$VERCEL_PROJECT_ID" ] && missing="$missing VERCEL_PROJECT_ID(variable)"
+          if [ -n "$missing" ]; then
+            echo "::error::Missing:$missing. See the release section of DEPLOY.md."
+            exit 1
+          fi
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - name: Install npm 11 and the Vercel CLI
+        run: npm install -g npm@11 vercel@59
+      - name: Pull the production environment
+        run: vercel pull --yes --environment=production
+      - name: Build
+        run: vercel build --prod
+      - name: Deploy and move the alias
+        id: deploy
+        run: echo "url=$(vercel deploy --prebuilt --prod | tail -n 1)" >> "$GITHUB_OUTPUT"
+      # Vercel only moves the alias after a good deploy, so a failure here leaves
+      # the previous release serving. Roll further back with `vercel promote`.
+      - name: Smoke test the public site
+        run: |
+          for attempt in $(seq 1 12); do
+            root=$(curl -sS -o /dev/null -w '%{http_code}' "$PROD_URL/" || echo none)
+            keepalive=$(curl -sS -o /dev/null -w '%{http_code}' "$PROD_URL/api/keepalive" || echo none)
+            echo "attempt $attempt: / -> $root, /api/keepalive -> $keepalive"
+            # 401 from the keep-alive is the right answer: no cron secret was sent.
+            if [ "$root" = "200" ] && [ "$keepalive" = "401" ]; then
+              echo "$PROD_URL is serving ${{ github.ref_name }}."
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "::error::$PROD_URL never came up healthy. Roll back: vercel promote <last good deployment>"
+          exit 1
+      - name: Write the release notes
+        run: |
+          tag="${{ github.ref_name }}"
+          gh release create "$tag" --title "$tag" --generate-notes
+          gh release view "$tag" --json body --jq .body > notes.md
+          printf '\nLive at %s — deployment %s\n' \
+            "$PROD_URL" "${{ steps.deploy.outputs.url }}" >> notes.md
+          gh release edit "$tag" --notes-file notes.md
+      - name: Report the URLs
+        run: |
+          {
+            echo "### Released ${{ github.ref_name }}"
+            echo ""
+            echo "- Public: $PROD_URL"
+            echo "- Deployment: ${{ steps.deploy.outputs.url }}"
+          } >> "$GITHUB_STEP_SUMMARY"

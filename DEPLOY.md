@@ -2,7 +2,8 @@
 
 How to get a change from this folder onto https://couplegoal-navy.vercel.app.
 Read "What is already set up" once; after that the everyday deploy is the
-five commands under "Deploy a change".
+five commands under "Deploy a change", or a tag if you let GitHub Actions
+publish for you.
 
 ## What is already set up
 
@@ -11,7 +12,7 @@ you only need to *log in* to them (see "Prerequisites").
 
 | Piece | Where | Notes |
 | --- | --- | --- |
-| Code | GitHub `johnnycuongn/TimelineGoal` (public), branch `web` | Same repo as the TimelineGoal mobile app (Expo + Firebase, branch `sdk54-expo-go`); this web app lives on the `web` branch. Local `main` tracks `origin/web`, so a plain `git push` goes there. GitHub is a backup only; **pushing does not deploy**. |
+| Code | GitHub `johnnycuongn/TimelineGoal` (public), branch `web` | Same repo as the TimelineGoal mobile app (Expo + Firebase, branch `sdk54-expo-go`); this web app lives on the `web` branch. Local `main` tracks `origin/web`, so a plain `git push` goes there. A push runs CI and a preview deploy; **only a `v*` tag publishes** (see "Release with GitHub Actions"). |
 | Hosting | Vercel project `couplegoal`, personal scope, Hobby plan | Production alias `couplegoal-navy.vercel.app`. Linked from this folder via the git-ignored `.vercel/` directory. |
 | Env vars on Vercel | `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY` (production + preview), `CRON_SECRET` (production) | `vercel env ls` shows names only. The two `VITE_` values are public by design; `CRON_SECRET` is the only secret and only Vercel's scheduler ever holds it. |
 | Cron | `vercel.json` → `/api/keepalive` every third day at 03:00 UTC | Pings Supabase so the free project never pauses for inactivity. Attached to production deploys only. |
@@ -59,6 +60,51 @@ private preview URL, does not touch the public site, and never runs the cron.
 
 Commit with explicit file paths, never `git add -A`, so a stray local file can never
 ride along.
+
+## Release with GitHub Actions
+
+The workflows in `.github/workflows/` do the same thing from GitHub, and they only
+live on the `web` branch. There are three files: `verify.yml` holds the check/test/
+build recipe, and both of the others call it, so the recipe cannot drift.
+
+| Workflow | Runs on | Does |
+| --- | --- | --- |
+| `ci.yml` | every push to `web`, every PR aimed at `web` | Verifies. A push also gets a preview URL, printed in the run's summary. Never touches the public site. |
+| `release.yml` | pushing a tag matching `v*` | Verifies the tagged commit, builds it with the production environment, publishes, smoke-tests `couplegoal-navy.vercel.app`, then writes the GitHub release notes. |
+
+So an everyday change is still the "Deploy a change" list above minus the last line,
+and publishing becomes:
+
+    git tag v0.2.0      # whatever the next version is
+    git push --tags     # this is what publishes
+
+Watch it with `gh run watch` or on the Actions tab. The smoke test waits up to a
+minute for the alias to answer 200 on `/` and 401 on `/api/keepalive`; if it never
+does, the run fails loudly and the previous release keeps serving, because Vercel
+only moves the alias after a good deploy. Roll further back with `vercel promote`
+as described under "Rolling back".
+
+`npx vercel --prod --yes` from your machine still works and is the fallback whenever
+Actions is in the way.
+
+### What the workflows need on GitHub (once)
+
+    gh secret set VERCEL_TOKEN --repo johnnycuongn/TimelineGoal    # paste a token from vercel.com/account/tokens
+    gh variable set VERCEL_ORG_ID --repo johnnycuongn/TimelineGoal --body "$(jq -r .orgId .vercel/project.json)"
+    gh variable set VERCEL_PROJECT_ID --repo johnnycuongn/TimelineGoal --body "$(jq -r .projectId .vercel/project.json)"
+
+The two IDs are not secret; they identify the project and come from the git-ignored
+`.vercel/project.json`. The token is, and nothing ever prints it. Secrets and
+variables are repo-wide, so the mobile branch of this repo can see them too.
+
+Until the token exists the preview job fails with a message saying exactly that.
+No Supabase value is needed here: `vercel build` pulls `VITE_SUPABASE_URL` and
+`VITE_SUPABASE_PUBLISHABLE_KEY` from the Vercel project itself. A plain
+`npm run build`, in CI or anywhere else, compiles but produces a bundle that throws
+on first load, which is why only `vercel build` output is ever deployed.
+
+Pushing changes to `.github/workflows/` needs the `workflow` scope on your GitHub
+token; `gh auth refresh -s workflow` adds it if a push is rejected.
 
 ## Verify after deploying
 

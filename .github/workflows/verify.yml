@@ -1,0 +1,32 @@
+# The one description of "is this code good": lint, types, tests, build.
+# Both CI and Release call it, so the recipe never drifts between them.
+name: Verify
+
+on:
+  workflow_call:
+
+jobs:
+  verify:
+    name: Check, test, build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      # npm 10 crashes with an `edgesOut` error on this dependency set (DEPLOY.md).
+      - name: Install npm 11
+        run: npm install -g npm@11
+      - name: Install dependencies
+        run: npm ci
+      - name: Lint and typecheck
+        run: npm run check
+      - name: Test
+        run: npm test
+      # Built without the VITE_* values on purpose: this only proves the app
+      # compiles. Vite never executes src/lib/supabase.ts, so a bundle built here
+      # would throw on first import in a browser. What ships is built by
+      # `vercel build`, which injects the real values from the Vercel project.
+      - name: Build
+        run: npm run build
