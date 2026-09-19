@@ -4,6 +4,7 @@ import AppShell from "@/components/app-shell";
 import RouteErrorPanel, { ErrorPanel } from "@/components/error-panel";
 import { DenContext, type DenValue } from "@/data/den-context";
 import { useMe } from "@/data/use-me";
+import DenPage from "@/pages/den";
 import LandingPage from "@/pages/landing";
 import LoginPage from "@/pages/login";
 import PairPage from "@/pages/pair";
@@ -71,14 +72,6 @@ function SignedOutOnly() {
   return <Outlet />;
 }
 
-function Placeholder({ title }: { title: string }) {
-  return (
-    <section className="page-wrap py-10">
-      <h1 className="display-title text-3xl">{title}</h1>
-    </section>
-  );
-}
-
 export const router = createBrowserRouter([
   {
     errorElement: <RouteErrorPanel />,
@@ -108,7 +101,7 @@ export const router = createBrowserRouter([
               {
                 element: <RequireDen />,
                 children: [
-                  { path: "/den", element: <Placeholder title="Den" /> },
+                  { path: "/den", element: <DenPage /> },
                   { path: "/goals", element: <TimelinePage /> },
                   { path: "/us", element: <UsPage /> },
                 ],
