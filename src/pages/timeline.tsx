@@ -272,7 +272,7 @@ export default function TimelinePage() {
           <Plus /> New {h === "day" ? "habit" : "goal"}
         </Button>
       </div>
-      <div className="island-shell relative mb-6 overflow-hidden p-2">
+      <div className="relative mb-6">
         <Pup className="h-[200px] sm:h-[240px]" name={pupName} />
         <Confetti burst={burst} />
       </div>
