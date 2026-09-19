@@ -1,7 +1,7 @@
 import { PawPrint } from "lucide-react";
 import { motion, useReducedMotion } from "motion/react";
 import { type ReactNode, useCallback } from "react";
-import { colorFor } from "@/components/partner-dot";
+import { colorFor, inkFor } from "@/components/partner-dot";
 import { useResolvedTheme } from "@/hooks/use-resolved-theme";
 import { type Goal, type Member, SHARED_OWNER } from "@/lib/domain";
 import type { HabitState } from "@/lib/ladder";
@@ -49,7 +49,7 @@ function StamperRow({
         style={{
           borderColor: color,
           background: done ? color : "transparent",
-          color: done ? "var(--primary-foreground)" : color,
+          color: done ? inkFor(member.color, theme) : color,
         }}
         transition={springs.press}
         type="button"
