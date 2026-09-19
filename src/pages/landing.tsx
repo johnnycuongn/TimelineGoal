@@ -20,6 +20,7 @@ import { ArrowRight, PawPrint } from "lucide-react";
 import { Link } from "react-router";
 import Pup from "@/components/pup/pup";
 import { Button } from "@/components/ui/button";
+import { usePreloadPup } from "@/hooks/use-preload-pup";
 
 interface Stage {
   n: string;
@@ -81,6 +82,7 @@ function Stages() {
 }
 
 export default function LandingPage() {
+  usePreloadPup();
   return (
     <div className="page-wrap pb-12 sm:pb-16">
       <section className="grid items-center gap-8 pt-8 pb-12 sm:pb-16 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] lg:gap-10">
