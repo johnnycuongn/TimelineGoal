@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/dialog";
 import { useResolvedTheme } from "@/hooks/use-resolved-theme";
 import type { Goal, Member } from "@/lib/domain";
+import { friendlyError } from "@/lib/errors";
 import { springs } from "@/lib/motion";
 
 const SEAL_CLOSE_MS = 600;
@@ -34,26 +35,42 @@ export default function SealDialog({
   const theme = useResolvedTheme();
   const reduced = useReducedMotion();
   const [pressing, setPressing] = useState(false);
-  const close = useCallback(() => onOpenChange(false), [onOpenChange]);
+  const [error, setError] = useState<string | null>(null);
+  // Every close path clears a stale failure, so the next goal opens clean.
+  const changeOpen = useCallback(
+    (next: boolean) => {
+      if (!next) {
+        setError(null);
+      }
+      onOpenChange(next);
+    },
+    [onOpenChange],
+  );
+  const close = useCallback(() => changeOpen(false), [changeOpen]);
   const press = useCallback(async () => {
     if (!goal) {
       return;
     }
     setPressing(true);
+    setError(null);
     try {
       await onSeal(goal);
-      window.setTimeout(() => onOpenChange(false), SEAL_CLOSE_MS);
-    } finally {
+      // Let the wax land before the dialog goes; the button stays held until then.
+      window.setTimeout(() => changeOpen(false), SEAL_CLOSE_MS);
       window.setTimeout(() => setPressing(false), SEAL_CLOSE_MS);
+    } catch (err) {
+      // Offline, an RLS refusal or the goal_seals trigger: say so and stay open.
+      setError(friendlyError(err));
+      setPressing(false);
     }
-  }, [goal, onSeal, onOpenChange]);
+  }, [goal, onSeal, changeOpen]);
 
   if (!goal) {
     return null;
   }
   const mine = Boolean(goal.seals[me]);
   return (
-    <Dialog onOpenChange={onOpenChange} open={open}>
+    <Dialog onOpenChange={changeOpen} open={open}>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Seal the deal</DialogTitle>
@@ -82,6 +99,11 @@ export default function SealDialog({
             );
           })}
         </div>
+        {error ? (
+          <p className="text-destructive text-sm" role="alert">
+            {error}
+          </p>
+        ) : null}
         <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
           <Button onClick={close} type="button" variant="ghost">
             Later
