@@ -190,6 +190,19 @@
   }
 }
 
+/* Enter/exit fades run at the spec's motion tokens, which DialogContent passes in as
+   --motion-*. Unlayered for the same reason as the bottom-sheet rule above: Tailwind's
+   utilities layer outranks @layer components, and tw-animate-css's animate-in carries a
+   duration of its own. Opacity only — the sheet does not slide. */
+[data-slot="dialog-overlay"][data-state="open"],
+[data-slot="dialog-content"][data-state="open"] {
+  animation-duration: var(--motion-enter);
+}
+[data-slot="dialog-overlay"][data-state="closed"],
+[data-slot="dialog-content"][data-state="closed"] {
+  animation-duration: var(--motion-exit);
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -198,5 +211,15 @@
     animation-duration: 0.01ms !important;
     /* biome-ignore lint/complexity/noImportantStyles: reduced motion must win over every transition */
     transition-duration: 0.01ms !important;
+  }
+}
+
+/* Reduced motion keeps a short fade rather than none: a dialog that appears between two
+   frames reads as a glitch. The blanket rule above zeroes every other animation. */
+@media (prefers-reduced-motion: reduce) {
+  [data-slot="dialog-overlay"],
+  [data-slot="dialog-content"] {
+    /* biome-ignore lint/complexity/noImportantStyles: has to beat the blanket reduced-motion rule */
+    animation-duration: var(--motion-reduced) !important;
   }
 }

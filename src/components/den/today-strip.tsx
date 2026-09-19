@@ -1,5 +1,6 @@
 import { Link } from "react-router";
 import HabitCard from "@/components/goals/habit-card";
+import StaggerItem from "@/components/stagger-item";
 import type { HabitToggle } from "@/hooks/use-habit-toggle";
 import type { Goal, Member } from "@/lib/domain";
 import type { HabitState } from "@/lib/ladder";
@@ -30,16 +31,17 @@ export default function TodayStrip({
   }
   return (
     <div className="grid gap-4 sm:grid-cols-2">
-      {habits.map((goal) => (
-        <HabitCard
-          busy={toggle.busy.has(goal.id)}
-          goal={goal}
-          key={goal.id}
-          me={me}
-          members={members}
-          onToggle={toggle.toggle}
-          state={toggle.view(goal.id, states[goal.id])}
-        />
+      {habits.map((goal, index) => (
+        <StaggerItem index={index} key={goal.id}>
+          <HabitCard
+            busy={toggle.busy.has(goal.id)}
+            goal={goal}
+            me={me}
+            members={members}
+            onToggle={toggle.toggle}
+            state={toggle.view(goal.id, states[goal.id])}
+          />
+        </StaggerItem>
       ))}
     </div>
   );

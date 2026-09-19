@@ -1,7 +1,17 @@
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { X } from "lucide-react";
-import { type ComponentProps, useCallback, useRef } from "react";
+import { type ComponentProps, type CSSProperties, useCallback, useRef } from "react";
+import { timings } from "@/lib/motion";
 import { cn } from "@/lib/utils";
+
+// The spec's enter/exit timings, handed to CSS. tw-animate-css's `animate-in`/`animate-out`
+// carry their own default duration, so the two rules that consume these live unlayered in
+// styles.css where they outrank the utilities. Opacity only: nothing moves on open or close.
+const MOTION_VARS = {
+  "--motion-enter": `${timings.enterMs}ms`,
+  "--motion-exit": `${timings.exitMs}ms`,
+  "--motion-reduced": `${timings.reducedMotionFadeMs}ms`,
+} as CSSProperties;
 
 export const Dialog = DialogPrimitive.Root;
 export const DialogTrigger = DialogPrimitive.Trigger;
@@ -36,7 +46,11 @@ export function DialogContent({
   );
   return (
     <DialogPrimitive.Portal>
-      <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/40 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
+      <DialogPrimitive.Overlay
+        className="fixed inset-0 z-50 bg-black/40 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0"
+        data-slot="dialog-overlay"
+        style={MOTION_VARS}
+      />
       <DialogPrimitive.Content
         className={cn(
           "fixed top-1/2 left-1/2 z-50 w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 rounded-[var(--radius-xl)] border border-border bg-card p-6 shadow-xl data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
@@ -46,6 +60,7 @@ export function DialogContent({
         {...props}
         onCloseAutoFocus={onCloseAutoFocus}
         onOpenAutoFocus={onOpenAutoFocus}
+        style={{ ...MOTION_VARS, ...props.style }}
       >
         {children}
         <DialogPrimitive.Close

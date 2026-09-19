@@ -1,59 +1,28 @@
 import { describe, expect, test } from "vitest";
 import { PRESS_SCALE, springs, timings } from "@/lib/motion";
 
-const SPRING_NAMES = ["default", "press", "bouncy"] as const;
-
-describe("springs", () => {
-  test("exposes exactly the three named springs", () => {
-    expect(Object.keys(springs).sort()).toEqual([...SPRING_NAMES].sort());
+/**
+ * The spec's motion tokens, written out. These assertions are the numbers from the
+ * plan's global constraints — not relationships between the constants, which can never
+ * fail for a reason anyone cares about — so any drift from the spec fails here.
+ */
+describe("motion tokens are the spec's numbers", () => {
+  test("springs", () => {
+    expect(springs.default).toEqual({ type: "spring", damping: 15, stiffness: 150, mass: 1 });
+    expect(springs.press).toEqual({ type: "spring", damping: 18, stiffness: 320, mass: 0.7 });
+    expect(springs.bouncy).toEqual({ type: "spring", damping: 9, stiffness: 180, mass: 0.9 });
   });
 
-  test("every spring is a spring with positive physics", () => {
-    for (const name of SPRING_NAMES) {
-      const spring = springs[name];
-      expect(spring.type).toBe("spring");
-      expect(spring.damping).toBeGreaterThan(0);
-      expect(spring.stiffness).toBeGreaterThan(0);
-      expect(spring.mass).toBeGreaterThan(0);
-    }
+  test("timings: enter 250ms, exit 170ms, stagger 40ms, reduced-motion fade 120ms", () => {
+    expect(timings).toEqual({
+      enterMs: 250,
+      exitMs: 170,
+      staggerMs: 40,
+      reducedMotionFadeMs: 120,
+    });
   });
 
-  test("press is the snappiest spring", () => {
-    // Presses must settle faster than layout motion, or taps feel laggy.
-    expect(springs.press.stiffness).toBeGreaterThan(springs.default.stiffness);
-    expect(springs.press.mass).toBeLessThan(springs.default.mass);
-  });
-
-  test("bouncy overshoots more than default", () => {
-    // Lower damping at comparable stiffness is what produces the celebratory bounce.
-    expect(springs.bouncy.damping).toBeLessThan(springs.default.damping);
-  });
-});
-
-describe("timings", () => {
-  test("all timings are positive whole milliseconds", () => {
-    for (const value of Object.values(timings)) {
-      expect(Number.isInteger(value)).toBe(true);
-      expect(value).toBeGreaterThan(0);
-    }
-  });
-
-  test("exit is quicker than enter", () => {
-    expect(timings.exitMs).toBeLessThan(timings.enterMs);
-  });
-
-  test("stagger is short enough that a list settles within one enter", () => {
-    expect(timings.staggerMs).toBeLessThan(timings.exitMs);
-  });
-
-  test("the reduced-motion fade is the shortest visible timing", () => {
-    expect(timings.reducedMotionFadeMs).toBeLessThan(timings.exitMs);
-  });
-});
-
-describe("PRESS_SCALE", () => {
-  test("shrinks on press without collapsing the target", () => {
-    expect(PRESS_SCALE).toBeGreaterThan(0.9);
-    expect(PRESS_SCALE).toBeLessThan(1);
+  test("press scale", () => {
+    expect(PRESS_SCALE).toBe(0.96);
   });
 });
