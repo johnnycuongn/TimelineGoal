@@ -23,8 +23,12 @@ function isNetwork(e: ErrorLike): boolean {
   return typeof message === "string" && NETWORK_FRAGMENTS.some((f) => message.includes(f));
 }
 
-/** Turns a Supabase/Postgres/auth error into copy the app can show as-is. */
-export function friendlyError(error: unknown): string {
+/**
+ * Turns a Supabase/Postgres/auth error into copy the app can show as-is.
+ * `fallback` is the caller's own line for an error that carries no message at all,
+ * so a toast can stay in the voice of what the tap was ("That paw didn't land").
+ */
+export function friendlyError(error: unknown, fallback: string = DEFAULT_COPY): string {
   const e = (error ?? {}) as ErrorLike;
   if (e.code === DUPLICATE_CODE) {
     return "Already stamped.";
@@ -45,7 +49,7 @@ export function friendlyError(error: unknown): string {
     }
     return e.message;
   }
-  return DEFAULT_COPY;
+  return fallback;
 }
 
 export function isDuplicate(error: unknown): boolean {

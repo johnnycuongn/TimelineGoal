@@ -3,6 +3,7 @@ import { toast } from "sonner";
 import { stamp, unstampHabit } from "@/data/goal-mutations";
 import { localDayKey } from "@/lib/day";
 import type { Goal } from "@/lib/domain";
+import { friendlyError } from "@/lib/errors";
 import type { HabitState } from "@/lib/ladder";
 
 export interface HabitToggle {
@@ -44,7 +45,7 @@ export function useHabitToggle(
         }
         await ctx.refresh();
       } catch (error) {
-        toast.error(error instanceof Error ? error.message : "That paw didn't land. Try again?");
+        toast.error(friendlyError(error, "That paw didn't land. Try again?"));
       } finally {
         setOverrides((prev) => {
           const { [goal.id]: _dropped, ...rest } = prev;

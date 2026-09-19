@@ -19,6 +19,7 @@ import { useResolvedTheme } from "@/hooks/use-resolved-theme";
 import { useToday } from "@/hooks/use-today";
 import { copyWithToast } from "@/lib/clipboard";
 import { type Goal, MAX_MEMBERS, type Member, type TickerItem } from "@/lib/domain";
+import { friendlyError } from "@/lib/errors";
 import { derivePersistentMood } from "@/lib/mood";
 import { type DenData, denView } from "@/lib/views";
 
@@ -119,7 +120,7 @@ function DenContent({
         await sendHeart({ checkinId: item.checkinId, uid: view.me, coupleId });
         await refresh();
       } catch (error) {
-        toast.error(error instanceof Error ? error.message : "The heart got lost. Try again?");
+        toast.error(friendlyError(error, "The heart got lost. Try again?"));
       }
     },
     [view.me, coupleId, refresh],

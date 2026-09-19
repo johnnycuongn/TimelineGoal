@@ -28,6 +28,7 @@ import {
   type MilestoneHorizon,
   SHARED_OWNER,
 } from "@/lib/domain";
+import { friendlyError } from "@/lib/errors";
 import { parentCandidates } from "@/lib/goals";
 import { computeProgress } from "@/lib/ladder";
 import { horizonOfPeriod, isValidPeriod, periodFor } from "@/lib/periods";
@@ -81,7 +82,7 @@ export default function TimelinePage() {
         await work();
         await refresh();
       } catch (err) {
-        toast.error(err instanceof Error ? err.message : "That didn't land. Try again?");
+        toast.error(friendlyError(err));
       } finally {
         setBusyGoal(null);
       }

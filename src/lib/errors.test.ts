@@ -43,8 +43,61 @@ describe("friendlyError", () => {
     expect(friendlyError(null)).toBe("That didn't land. Try again?");
   });
 
+  test("a caller's fallback only covers an error with nothing to say", () => {
+    const paw = "That paw didn't land. Try again?";
+    // Nothing usable in the error: the caller's own voice, not the generic line.
+    expect(friendlyError(null, paw)).toBe(paw);
+    expect(friendlyError({}, paw)).toBe(paw);
+    expect(friendlyError("stringly thrown", paw)).toBe(paw);
+    // A failure we have copy for always wins over the fallback.
+    expect(friendlyError(new TypeError("Failed to fetch"), paw)).toBe(
+      "We couldn't reach the den. Check your connection and try again.",
+    );
+    expect(friendlyError({ message: "TypeError: Failed to fetch", code: "" }, paw)).toBe(
+      "We couldn't reach the den. Check your connection and try again.",
+    );
+    expect(friendlyError({ code: "23514", message: "violates check constraint" }, paw)).toBe(
+      "That didn't fit. Have another look and try again?",
+    );
+    // Copy that already came through friendlyError once survives a second pass.
+    expect(friendlyError(new Error("We haven't found your den yet."), paw)).toBe(
+      "We haven't found your den yet.",
+    );
+  });
+
   test("isDuplicate only matches 23505", () => {
     expect(isDuplicate({ code: "23505" })).toBe(true);
     expect(isDuplicate({ code: "23514" })).toBe(false);
+  });
+});
+
+/** Every user-facing toast has to go through friendlyError, not print the error itself. */
+describe("no toast prints a raw error", () => {
+  const RAW_TOAST = /toast\.error\([^;]*?\.message/;
+  const RAW_MESSAGE = /instanceof Error \?[^;]*?\.message/;
+
+  // Every source file in src/, read as text, test files excluded.
+  const modules = import.meta.glob("../**/*.{ts,tsx}", {
+    query: "?raw",
+    import: "default",
+    eager: true,
+  }) as Record<string, string>;
+  const sources = Object.entries(modules).filter(([path]) => !path.includes(".test."));
+
+  function offenders(pattern: RegExp): string[] {
+    return sources.filter(([, source]) => pattern.test(source)).map(([path]) => path);
+  }
+
+  test("there is something to scan", () => {
+    expect(sources.length).toBeGreaterThan(40);
+  });
+
+  test("toast.error never reads .message off the error", () => {
+    expect(offenders(RAW_TOAST)).toEqual([]);
+  });
+
+  test("the diagnostics panel is the only place that shows an error verbatim", () => {
+    // error-panel.tsx prints the message in a <pre> under friendly prose, on purpose.
+    expect(offenders(RAW_MESSAGE)).toEqual(["../components/error-panel.tsx"]);
   });
 });
