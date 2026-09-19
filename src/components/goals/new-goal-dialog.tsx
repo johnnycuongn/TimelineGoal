@@ -1,4 +1,4 @@
-import { type ChangeEvent, type FormEvent, useCallback, useState } from "react";
+import { type ChangeEvent, type FormEvent, useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -10,7 +10,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { NativeSelect } from "@/components/ui/native-select";
-import { createGoal } from "@/data/goal-mutations";
+import { createGoal, updateGoal } from "@/data/goal-mutations";
 import {
   GOAL_TARGET_MAX,
   GOAL_TARGET_MIN,
@@ -31,6 +31,13 @@ const HORIZON_HINT: Record<Horizon, string> = {
 const CHARM_INPUT_MAX = 16;
 const DEFAULT_TARGET = 3;
 
+function submitLabel(editing: boolean, sealsOnCreate: boolean): string {
+  if (editing) {
+    return "Save";
+  }
+  return sealsOnCreate ? "Create and seal" : "Create";
+}
+
 export interface GoalDialogContext {
   coupleId: string;
   uid: string;
@@ -45,6 +52,8 @@ export default function NewGoalDialog({
   open,
   onOpenChange,
   onCreated,
+  editing,
+  onSaved,
   ctx,
 }: {
   horizon: Horizon;
@@ -54,6 +63,8 @@ export default function NewGoalDialog({
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onCreated: (goal: Goal) => void;
+  editing?: Goal | null;
+  onSaved?: (goal: Goal) => void;
   ctx: GoalDialogContext;
 }) {
   const [title, setTitle] = useState("");
@@ -63,6 +74,29 @@ export default function NewGoalDialog({
   const [parentGoalId, setParentGoalId] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+
+  // Parents live one horizon up, so a pick made on another tab can never be right.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: horizon is the reset trigger, not a value the effect reads
+  useEffect(() => {
+    setParentGoalId("");
+  }, [horizon]);
+
+  // The dialog doubles as the editor; closing it hands the form back to "new".
+  useEffect(() => {
+    if (editing) {
+      setTitle(editing.title);
+      setCharm(editing.charm ?? "");
+      setOwner(editing.owner);
+      setTarget(editing.targetUnits ?? DEFAULT_TARGET);
+      setParentGoalId(editing.parentGoalId ?? "");
+      return;
+    }
+    setTitle("");
+    setCharm("");
+    setOwner(me);
+    setTarget(DEFAULT_TARGET);
+    setParentGoalId("");
+  }, [editing, me]);
 
   const onTitle = useCallback((e: ChangeEvent<HTMLInputElement>) => setTitle(e.target.value), []);
   const onCharm = useCallback((e: ChangeEvent<HTMLInputElement>) => setCharm(e.target.value), []);
@@ -83,6 +117,23 @@ export default function NewGoalDialog({
       setBusy(true);
       setError(null);
       try {
+        if (editing) {
+          await updateGoal(editing.id, {
+            title,
+            charm: charm || null,
+            targetUnits: horizon === "day" ? undefined : target,
+            parentGoalId: parentGoalId || null,
+          });
+          onSaved?.({
+            ...editing,
+            title,
+            charm: charm || null,
+            targetUnits: horizon === "day" ? null : target,
+            parentGoalId: parentGoalId || null,
+          });
+          onOpenChange(false);
+          return;
+        }
         const goal = await createGoal({
           coupleId: ctx.coupleId,
           uid: ctx.uid,
@@ -107,7 +158,19 @@ export default function NewGoalDialog({
         setBusy(false);
       }
     },
-    [ctx, title, charm, horizon, owner, target, parentGoalId, onCreated, onOpenChange],
+    [
+      ctx,
+      title,
+      charm,
+      horizon,
+      owner,
+      target,
+      parentGoalId,
+      onCreated,
+      onOpenChange,
+      editing,
+      onSaved,
+    ],
   );
 
   // The wax is a milestone ritual, so a shared daily habit is created without one.
@@ -117,7 +180,9 @@ export default function NewGoalDialog({
     <Dialog onOpenChange={onOpenChange} open={open}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>New {horizon === "day" ? "habit" : "goal"}</DialogTitle>
+          <DialogTitle>
+            {editing ? "Edit" : "New"} {horizon === "day" ? "habit" : "goal"}
+          </DialogTitle>
           <DialogDescription>{HORIZON_HINT[horizon]}</DialogDescription>
         </DialogHeader>
         <form className="space-y-4" onSubmit={submit}>
@@ -145,7 +210,12 @@ export default function NewGoalDialog({
           </div>
           <div className="space-y-2">
             <Label htmlFor="goal-owner">Whose goal</Label>
-            <NativeSelect id="goal-owner" onChange={onOwner} value={owner}>
+            <NativeSelect
+              disabled={Boolean(editing)}
+              id="goal-owner"
+              onChange={onOwner}
+              value={owner}
+            >
               {members.map((m) => (
                 <option key={m.id} value={m.id}>
                   {m.id === me ? "Mine" : `${m.displayName}'s`}
@@ -192,7 +262,7 @@ export default function NewGoalDialog({
               Cancel
             </Button>
             <Button disabled={busy || title.trim().length === 0} type="submit">
-              {sealsOnCreate ? "Create and seal" : "Create"}
+              {submitLabel(Boolean(editing), sealsOnCreate)}
             </Button>
           </div>
         </form>
