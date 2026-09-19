@@ -89,15 +89,28 @@ Actions is in the way.
 
 ### What the workflows need on GitHub (once)
 
-    gh secret set VERCEL_TOKEN --repo johnnycuongn/TimelineGoal    # paste a token from vercel.com/account/tokens
-    gh variable set VERCEL_ORG_ID --repo johnnycuongn/TimelineGoal --body "$(jq -r .orgId .vercel/project.json)"
-    gh variable set VERCEL_PROJECT_ID --repo johnnycuongn/TimelineGoal --body "$(jq -r .projectId .vercel/project.json)"
+Three repository secrets:
 
-The two IDs are not secret; they identify the project and come from the git-ignored
-`.vercel/project.json`. The token is, and nothing ever prints it. Secrets and
-variables are repo-wide, so the mobile branch of this repo can see them too.
+| Secret | From |
+| --- | --- |
+| `VERCEL_TOKEN` | vercel.com/account/tokens |
+| `VERCEL_ORG_ID` | `orgId` in the git-ignored `.vercel/project.json` |
+| `VERCEL_PROJECT_ID` | `projectId` in the same file |
 
-Until the token exists the preview job fails with a message saying exactly that.
+The two IDs are not credentials, but this repo is public, so its run logs are too,
+and Vercel says not to share the `.vercel` folder. As secrets they come out of the
+logs as `***`; as variables they would be printed in full.
+
+**Watch out:** `gh secret set NAME` reads the value from standard input whenever it
+has no terminal, so running it from a script or a non-interactive shell quietly
+stores an *empty* secret and prints nothing. Set one by piping the value in, then
+check the workflow log shows `***` and not a blank:
+
+    pbpaste | tr -d '\n' | gh secret set VERCEL_TOKEN --repo johnnycuongn/TimelineGoal
+
+Secrets are repo-wide, so the mobile branch of this repo can read them too. If any
+of the three is missing or empty, both deploy jobs stop on their first step and name
+the one that is missing.
 No Supabase value is needed here: `vercel build` pulls `VITE_SUPABASE_URL` and
 `VITE_SUPABASE_PUBLISHABLE_KEY` from the Vercel project itself. A plain
 `npm run build`, in CI or anywhere else, compiles but produces a bundle that throws
