@@ -182,13 +182,17 @@
 @media (max-width: 639px) {
   [data-slot="dialog-content"] {
     top: auto;
-    bottom: 0;
+    /* Above the keyboard, not behind it: main.tsx keeps --keyboard-inset at the height
+       the keyboard covers, because `fixed` pins this to the layout viewport and iOS
+       never shrinks that. The max-height shrinks with it so the top of a tall sheet
+       cannot be pushed off the screen. */
+    bottom: var(--keyboard-inset, 0px);
     left: 0;
     right: 0;
     translate: none;
     width: 100%;
     max-width: 100%;
-    max-height: 90dvh;
+    max-height: calc(90dvh - var(--keyboard-inset, 0px));
     overflow-y: auto;
     border-radius: var(--radius-xl) var(--radius-xl) 0 0;
     padding-bottom: calc(1.5rem + env(safe-area-inset-bottom));

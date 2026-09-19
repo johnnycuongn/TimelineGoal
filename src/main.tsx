@@ -5,8 +5,15 @@ import { RouterProvider } from "react-router";
 import { Toaster } from "sonner";
 import { AuthProvider } from "@/auth/auth-provider";
 import { PupMoodProvider } from "@/components/pup/pup-mood-context";
+import { watchKeyboardInset } from "@/lib/keyboard-inset";
 import { router } from "@/routes";
 import "@/styles.css";
+
+// The bottom sheet reads this to sit on top of the software keyboard instead of behind
+// it. Set on the root for the whole session: only the sheet consumes it.
+watchKeyboardInset(window, (px) => {
+  document.documentElement.style.setProperty("--keyboard-inset", `${px}px`);
+});
 
 const root = document.getElementById("root");
 if (!root) {
