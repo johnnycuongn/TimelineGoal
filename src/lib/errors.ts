@@ -4,9 +4,12 @@ const DUPLICATE_CODE = "23505";
 const CHECK_VIOLATION = "23514";
 // postgrest-js catches a failed fetch and re-shapes it as a plain object whose message is
 // `${name}: ${message}` — "TypeError: Failed to fetch". Match on the fragment, not equality,
-// or an offline phone shows the browser's own wording in a toast.
+// or an offline phone shows the browser's own wording in a toast. Every browser's real
+// fetch failure is in this list, which is why the *name* "TypeError" is deliberately not:
+// it would dress every programming error ("x is not a function") up as an offline message
+// and hide the bug from the developer entirely.
 const NETWORK_FRAGMENTS = ["Failed to fetch", "fetch failed", "Load failed", "NetworkError"];
-const NETWORK_NAMES = ["FetchError", "TypeError"];
+const NETWORK_NAMES = ["FetchError"];
 
 interface ErrorLike {
   message?: unknown;

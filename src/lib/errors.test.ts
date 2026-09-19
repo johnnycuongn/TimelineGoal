@@ -36,6 +36,19 @@ describe("friendlyError", () => {
     expect(friendlyError({ name: "FetchError", message: "request to ... failed" })).toBe(offline);
   });
 
+  test("a plain TypeError is a bug, not an offline phone", () => {
+    // "TypeError" was in NETWORK_NAMES, which dressed every programming error up as a
+    // connection problem and hid it from the developer completely.
+    const offline = "We couldn't reach the den. Check your connection and try again.";
+    expect(friendlyError(new TypeError("x is not a function"))).not.toBe(offline);
+    expect(friendlyError(new TypeError("x is not a function"))).toBe("x is not a function");
+    expect(
+      friendlyError({ name: "TypeError", message: "Cannot read properties of undefined" }),
+    ).toBe("Cannot read properties of undefined");
+    // A real fetch failure still maps, by its message, whatever the error is called.
+    expect(friendlyError(new TypeError("Failed to fetch"))).toBe(offline);
+  });
+
   test("passes a database rule's own wording straight through", () => {
     expect(friendlyError({ message: "That code isn't waiting for anyone." })).toBe(
       "That code isn't waiting for anyone.",
