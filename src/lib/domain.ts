@@ -7,14 +7,28 @@ export type MilestoneHorizon = Exclude<Horizon, "day">;
 
 export type Mood = "idle" | "happy" | "party" | "proud" | "sleepy" | "pout" | "love";
 
+/**
+ * The spec's partner palette, plus the ink that goes *on* each swatch.
+ *
+ * A swatch is a background in its own right, so its ink does not follow the theme's
+ * --foreground: every dark-theme swatch is a pastel and needs dark ink. `ink` is
+ * therefore picked per colour and per theme for WCAG 4.5:1 at 12–14 px (PartnerDot's
+ * initial is 12 px). Measured ratios, white / #0F172A:
+ *   light  rose 6.04/2.96 · teal 3.74/4.77 · blueberry 6.29/2.84 · tangerine 3.56/5.02
+ *          grape 5.70/3.13 · lime 4.99/3.58 · sky 4.10/4.36
+ *   dark   every swatch clears 4.5 only against dark ink (5.98 blueberry … 11.84 lime).
+ * Light sky is the one swatch neither reaches 4.5 on, so it takes #000000 (5.12).
+ * These are hexes rather than tokens on purpose: the palette itself lives here, and no
+ * theme token is dark in both themes.
+ */
 export const PARTNER_COLORS = {
-  rose: { light: "#BE185D", dark: "#F472B6" },
-  teal: { light: "#0D9488", dark: "#2DD4BF" },
-  blueberry: { light: "#4F46E5", dark: "#818CF8" },
-  tangerine: { light: "#EA580C", dark: "#FB923C" },
-  grape: { light: "#7C3AED", dark: "#A78BFA" },
-  lime: { light: "#4D7C0F", dark: "#A3E635" },
-  sky: { light: "#0284C7", dark: "#38BDF8" },
+  rose: { light: "#BE185D", dark: "#F472B6", ink: { light: "#FFFFFF", dark: "#0F172A" } },
+  teal: { light: "#0D9488", dark: "#2DD4BF", ink: { light: "#0F172A", dark: "#0F172A" } },
+  blueberry: { light: "#4F46E5", dark: "#818CF8", ink: { light: "#FFFFFF", dark: "#0F172A" } },
+  tangerine: { light: "#EA580C", dark: "#FB923C", ink: { light: "#0F172A", dark: "#0F172A" } },
+  grape: { light: "#7C3AED", dark: "#A78BFA", ink: { light: "#FFFFFF", dark: "#0F172A" } },
+  lime: { light: "#4D7C0F", dark: "#A3E635", ink: { light: "#FFFFFF", dark: "#0F172A" } },
+  sky: { light: "#0284C7", dark: "#38BDF8", ink: { light: "#000000", dark: "#0F172A" } },
 } as const;
 export type PartnerColorKey = keyof typeof PARTNER_COLORS;
 export const partnerColorKeys = Object.keys(PARTNER_COLORS) as PartnerColorKey[];
@@ -120,7 +134,7 @@ export interface CoupleData {
   couple: Couple;
   members: Member[];
   goals: Goal[];
-  /** Check-ins since 1 January of the viewed year, newest first. */
+  /** Check-ins from the fetch's floor day onwards (`checkinFloor`), newest first. */
   checkins: CheckIn[];
 }
 

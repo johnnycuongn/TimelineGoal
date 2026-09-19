@@ -5,9 +5,11 @@ import {
   type CheckinRow,
   checkinFromRow,
   coupleFromRow,
+  type GoalRow,
   goalFromRow,
   memberFromRow,
   type ReactionRow,
+  type SealRow,
 } from "./mappers";
 
 export interface Me {
@@ -76,15 +78,33 @@ async function fetchAllRows<Row>(select: PagedSelect<Row>): Promise<Row[]> {
 }
 
 /**
- * Everything a den needs, from 1 January of the viewed year. Six reads in parallel; the
- * two that grow with every stamp are paged so nothing is quietly left behind.
+ * Everything a den needs, from `fromDay` onwards (see `checkinFloor`). Six reads in
+ * parallel; the four that grow are paged so nothing is quietly left behind.
  */
 export async function fetchCoupleData(coupleId: string, fromDay: string): Promise<CoupleData> {
   const [couple, members, goals, seals, checkins, reactions] = await Promise.all([
     supabase.from("couples").select("*").eq("id", coupleId).single(),
     supabase.from("members").select("*").eq("couple_id", coupleId).order("joined_at"),
-    supabase.from("goals").select("*").eq("couple_id", coupleId).order("created_at"),
-    supabase.from("goal_seals").select("*").eq("couple_id", coupleId),
+    // Paged as well: unreachable for two people, but a truncated goal list would
+    // silently drop history, and the paging costs one extra field on the request.
+    fetchAllRows<GoalRow>((from, to) =>
+      supabase
+        .from("goals")
+        .select("*", { count: "exact" })
+        .eq("couple_id", coupleId)
+        .order("created_at")
+        .order("id")
+        .range(from, to),
+    ),
+    fetchAllRows<SealRow>((from, to) =>
+      supabase
+        .from("goal_seals")
+        .select("*", { count: "exact" })
+        .eq("couple_id", coupleId)
+        .order("goal_id")
+        .order("user_id")
+        .range(from, to),
+    ),
     // Paged: two partners stamping a handful of shared habits pass 1000 rows inside a
     // year. The order is total (`id` breaks any tie on `at`), so the pages line up.
     fetchAllRows<CheckinRow>((from, to) =>
@@ -97,7 +117,7 @@ export async function fetchCoupleData(coupleId: string, fromDay: string): Promis
         .order("id", { ascending: false })
         .range(from, to),
     ),
-    // Paged too, and this one is not even bounded by the year: hearts accumulate for
+    // Paged too, and this one is not even bounded by the window: hearts accumulate for
     // the life of the den. Ordered by its primary key so the pages line up.
     fetchAllRows<ReactionRow>((from, to) =>
       supabase
@@ -109,7 +129,7 @@ export async function fetchCoupleData(coupleId: string, fromDay: string): Promis
         .range(from, to),
     ),
   ]);
-  for (const result of [couple, members, goals, seals]) {
+  for (const result of [couple, members]) {
     if (result.error) {
       throw result.error;
     }
@@ -117,11 +137,10 @@ export async function fetchCoupleData(coupleId: string, fromDay: string): Promis
   if (!couple.data) {
     throw new Error("This den is gone.");
   }
-  const sealRows = seals.data ?? [];
   return {
     couple: coupleFromRow(couple.data),
     members: (members.data ?? []).map(memberFromRow),
-    goals: (goals.data ?? []).map((g) => goalFromRow(g, sealRows)),
+    goals: goals.map((g) => goalFromRow(g, seals)),
     checkins: checkins.map((c) => checkinFromRow(c, reactions)),
   };
 }

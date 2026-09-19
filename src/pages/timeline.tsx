@@ -13,11 +13,19 @@ import SealDialog from "@/components/goals/seal-dialog";
 import Confetti from "@/components/pup/confetti";
 import Pup from "@/components/pup/pup";
 import { usePupMood } from "@/components/pup/pup-mood-context";
+import StaggerItem from "@/components/stagger-item";
 import { Button } from "@/components/ui/button";
 import { useDen } from "@/data/den-context";
-import { archiveGoal, sealGoal, stamp, undoLastMilestonePaw } from "@/data/goal-mutations";
+import {
+  archiveGoal,
+  sealGoal,
+  stamp,
+  undoLastMilestonePaw,
+  updateGoal,
+} from "@/data/goal-mutations";
 import { useCoupleData } from "@/data/use-couple-data";
 import { useHabitToggle } from "@/hooks/use-habit-toggle";
+import { usePreloadPup } from "@/hooks/use-preload-pup";
 import { useToday } from "@/hooks/use-today";
 import { localDayKey } from "@/lib/day";
 import {
@@ -31,7 +39,7 @@ import {
 import { friendlyError } from "@/lib/errors";
 import { parentCandidates } from "@/lib/goals";
 import { computeProgress } from "@/lib/ladder";
-import { horizonOfPeriod, isValidPeriod, periodFor } from "@/lib/periods";
+import { checkinFloor, horizonOfPeriod, isValidPeriod, periodFor } from "@/lib/periods";
 import { type TimelineData, timelineView, toLite } from "@/lib/views";
 
 function isHorizon(value: string | null): value is Horizon {
@@ -41,7 +49,7 @@ function isHorizon(value: string | null): value is Horizon {
 export default function TimelinePage() {
   const { me } = useDen();
   const today = useToday();
-  const { data, error, refresh } = useCoupleData(me.couple.id, today);
+  usePreloadPup();
   const [params, setParams] = useSearchParams();
   const [dialogOpen, setDialogOpen] = useState(false);
 
@@ -49,6 +57,11 @@ export default function TimelinePage() {
   const h: Horizon = isHorizon(hParam) ? hParam : "day";
   const periodParam = params.get("period");
   const period = periodParam && isValidPeriod(periodParam) ? periodParam : undefined;
+
+  // The fetch floor follows the period on screen: walking the picker back into an
+  // older year refetches from 1 January of that year, so a memory shows its paws
+  // instead of an empty bar. Same key as the Den whenever no memory is open.
+  const { data, error, refresh } = useCoupleData(me.couple.id, checkinFloor(period, today));
 
   const ctx = useMemo(
     () => ({ coupleId: me.couple.id, me: me.userId, refresh }),
@@ -80,12 +93,15 @@ export default function TimelinePage() {
       setBusyGoal(goal.id);
       try {
         await work();
-        await refresh();
       } catch (err) {
         toast.error(friendlyError(err));
-      } finally {
         setBusyGoal(null);
+        return;
       }
+      // The write landed. A failed *refresh* must not be reported as a failed action:
+      // the next Realtime event or the 60 s revalidation brings the view back in line.
+      await refresh().catch(() => undefined);
+      setBusyGoal(null);
     },
     [busyGoal, refresh],
   );
@@ -105,6 +121,7 @@ export default function TimelinePage() {
           goalId: goal.id,
           uid: me.userId,
           day,
+          horizon: goal.horizon,
         });
         if (!created) {
           return;
@@ -136,12 +153,32 @@ export default function TimelinePage() {
       }),
     [runGoalAction, data, me.userId],
   );
+  // Archiving is one tap in a dropdown and nothing in the app lists an archived goal,
+  // so the way back is the toast. `archived_at = null` is an ordinary update the RLS
+  // policy already allows.
+  const unarchive = useCallback(
+    (goal: Goal) => {
+      void (async () => {
+        try {
+          await updateGoal(goal.id, { archivedAt: null });
+          await refresh();
+          toast("Back where it was.");
+        } catch (err) {
+          toast.error(friendlyError(err));
+        }
+      })();
+    },
+    [refresh],
+  );
   const archive = useCallback(
     (goal: Goal) =>
       runGoalAction(goal, async () => {
         await archiveGoal(goal.id);
+        toast("Tucked away. Nothing is lost — we kept every paw print.", {
+          action: { label: "Bring it back", onClick: () => unarchive(goal) },
+        });
       }),
-    [runGoalAction],
+    [runGoalAction, unarchive],
   );
   const seal = useCallback(
     async (goal: Goal) => {
@@ -247,17 +284,18 @@ export default function TimelinePage() {
                 No habits yet. Add the first small thing you'll do every day.
               </p>
             ) : null}
-            {[...mine, ...theirs].map((goal) => (
-              <HabitCard
-                busy={habitToggle.busy.has(goal.id)}
-                goal={goal}
-                key={goal.id}
-                me={view.me}
-                members={view.members}
-                menu={<GoalMenu goal={goal} onArchive={archive} onEdit={edit} />}
-                onToggle={habitToggle.toggle}
-                state={habitToggle.view(goal.id, view.habits[goal.id])}
-              />
+            {[...mine, ...theirs].map((goal, index) => (
+              <StaggerItem index={index} key={goal.id}>
+                <HabitCard
+                  busy={habitToggle.busy.has(goal.id)}
+                  goal={goal}
+                  me={view.me}
+                  members={view.members}
+                  menu={<GoalMenu goal={goal} onArchive={archive} onEdit={edit} />}
+                  onToggle={habitToggle.toggle}
+                  state={habitToggle.view(goal.id, view.habits[goal.id])}
+                />
+              </StaggerItem>
             ))}
           </div>
         ) : (
@@ -344,37 +382,38 @@ function MilestoneSection({
         </p>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2">
-          {goals.map((goal) => {
+          {goals.map((goal, index) => {
             const progress = data.progress[goal.id];
             return (
-              <MilestoneCard
-                busy={busyGoal === goal.id}
-                childGoals={data.goals.filter((g) => g.parentGoalId === goal.id)}
-                goal={goal}
-                key={goal.id}
-                me={data.me}
-                members={data.members}
-                menu={
-                  readOnly ? undefined : (
-                    <GoalMenu
-                      canUndo={
-                        (progress?.own ?? 0) > 0 &&
-                        (goal.owner === data.me || goal.owner === SHARED_OWNER)
-                      }
-                      goal={goal}
-                      onArchive={onArchive}
-                      onEdit={onEdit}
-                      onUndo={onUndo}
-                    />
-                  )
-                }
-                onSeal={onSeal}
-                onStamp={onStamp}
-                parent={goal.parentGoalId ? byId.get(goal.parentGoalId) : undefined}
-                progress={progress}
-                progressById={data.progress}
-                readOnly={readOnly}
-              />
+              <StaggerItem index={index} key={goal.id}>
+                <MilestoneCard
+                  busy={busyGoal === goal.id}
+                  childGoals={data.goals.filter((g) => g.parentGoalId === goal.id)}
+                  goal={goal}
+                  me={data.me}
+                  members={data.members}
+                  menu={
+                    readOnly ? undefined : (
+                      <GoalMenu
+                        canUndo={
+                          (progress?.own ?? 0) > 0 &&
+                          (goal.owner === data.me || goal.owner === SHARED_OWNER)
+                        }
+                        goal={goal}
+                        onArchive={onArchive}
+                        onEdit={onEdit}
+                        onUndo={onUndo}
+                      />
+                    )
+                  }
+                  onSeal={onSeal}
+                  onStamp={onStamp}
+                  parent={goal.parentGoalId ? byId.get(goal.parentGoalId) : undefined}
+                  progress={progress}
+                  progressById={data.progress}
+                  readOnly={readOnly}
+                />
+              </StaggerItem>
             );
           })}
         </div>

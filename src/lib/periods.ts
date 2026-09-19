@@ -10,6 +10,7 @@ const YEAR_RE = /^(\d{4})$/;
 const MS_PER_DAY = 86_400_000;
 const MONTHS_PER_QUARTER = 3;
 const MONTHS_PER_YEAR = 12;
+const YEAR_KEY_LENGTH = 4;
 const MONTH_NAMES = [
   "January",
   "February",
@@ -173,4 +174,26 @@ export function parentHorizon(horizon: Horizon): Horizon | null {
 export function childHorizon(horizon: Horizon): Horizon | null {
   const index = HORIZONS.indexOf(horizon);
   return index > 0 ? (HORIZONS[index - 1] ?? null) : null;
+}
+
+/**
+ * How much check-in history one fetch carries: a rolling year plus a few days, so
+ * 1 January is not a cliff for a streak or a 7-day strip.
+ */
+export const CHECKIN_WINDOW_DAYS = 370;
+
+/**
+ * The earliest day a page needs check-ins for. Always the rolling window, and —
+ * when the PeriodPicker has been walked into an older period — 1 January of that
+ * period's year as well, so a memory shows the paws it actually collected instead
+ * of an empty progress bar. The whole year is taken rather than the period itself
+ * so stepping month by month inside one year does not refetch every step.
+ */
+export function checkinFloor(viewedPeriod: string | undefined, today: string): string {
+  const rolling = shiftDay(today, -CHECKIN_WINDOW_DAYS);
+  if (viewedPeriod === undefined || !isValidPeriod(viewedPeriod)) {
+    return rolling;
+  }
+  const { start } = periodRange(viewedPeriod.slice(0, YEAR_KEY_LENGTH));
+  return start < rolling ? start : rolling;
 }

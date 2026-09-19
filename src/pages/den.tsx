@@ -15,12 +15,14 @@ import { sendHeart } from "@/data/goal-mutations";
 import { useCoupleData } from "@/data/use-couple-data";
 import { useHabitToggle } from "@/hooks/use-habit-toggle";
 import { usePartnerActivity } from "@/hooks/use-partner-activity";
+import { usePreloadPup } from "@/hooks/use-preload-pup";
 import { useResolvedTheme } from "@/hooks/use-resolved-theme";
 import { useToday } from "@/hooks/use-today";
 import { copyWithToast } from "@/lib/clipboard";
 import { type Goal, MAX_MEMBERS, type Member, type TickerItem } from "@/lib/domain";
 import { friendlyError } from "@/lib/errors";
 import { derivePersistentMood } from "@/lib/mood";
+import { checkinFloor } from "@/lib/periods";
 import { type DenData, denView } from "@/lib/views";
 
 function WaitingForPartner({ code }: { code: string }) {
@@ -164,7 +166,9 @@ function DenContent({
 export default function DenPage() {
   const { me } = useDen();
   const today = useToday();
-  const { data, error, refresh } = useCoupleData(me.couple.id, today);
+  usePreloadPup();
+  // The Den never looks at an older period, so the rolling window is the whole floor.
+  const { data, error, refresh } = useCoupleData(me.couple.id, checkinFloor(undefined, today));
   // Only a cold failure blanks the page: with keepPreviousData a failed background
   // revalidation must not throw away a warm Den.
   if (error && !data) {

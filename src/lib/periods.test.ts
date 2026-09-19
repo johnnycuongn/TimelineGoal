@@ -1,5 +1,7 @@
 import { describe, expect, test } from "vitest";
 import {
+  CHECKIN_WINDOW_DAYS,
+  checkinFloor,
   childHorizon,
   dayKeyFromDate,
   daysBetween,
@@ -101,5 +103,44 @@ describe("periods", () => {
     expect(parentHorizon("year")).toBeNull();
     expect(childHorizon("month")).toBe("day");
     expect(childHorizon("day")).toBeNull();
+  });
+});
+
+/**
+ * The fetch floor for check-ins. The bug this guards: the old window started at
+ * 1 January of the current year, so a memory in an older period showed 0 paws and
+ * every streak reset on New Year's Day.
+ */
+describe("checkinFloor", () => {
+  const TODAY = "2026-09-19";
+  const ROLLING = "2025-09-14";
+
+  test("no period on screen: the rolling window, which is more than a year", () => {
+    expect(checkinFloor(undefined, TODAY)).toBe(ROLLING);
+    expect(daysBetween(checkinFloor(undefined, TODAY), TODAY)).toBe(CHECKIN_WINDOW_DAYS);
+    expect(CHECKIN_WINDOW_DAYS).toBeGreaterThan(365);
+  });
+
+  test("a period inside the rolling window does not widen it", () => {
+    expect(checkinFloor("2026-09", TODAY)).toBe(ROLLING);
+    expect(checkinFloor("2026-Q1", TODAY)).toBe(ROLLING);
+    expect(checkinFloor("2026", TODAY)).toBe(ROLLING);
+  });
+
+  test("an older period widens the floor to 1 January of its year", () => {
+    expect(checkinFloor("2025-12", TODAY)).toBe("2025-01-01");
+    expect(checkinFloor("2025-Q4", TODAY)).toBe("2025-01-01");
+    expect(checkinFloor("2025", TODAY)).toBe("2025-01-01");
+    expect(checkinFloor("2019-03", TODAY)).toBe("2019-01-01");
+  });
+
+  test("the year boundary is not a cliff: 1 January still reaches back a full year", () => {
+    expect(checkinFloor(undefined, "2027-01-01")).toBe("2025-12-27");
+    expect(checkinFloor("2027-01", "2027-01-01")).toBe("2025-12-27");
+  });
+
+  test("a junk period falls back to the rolling window instead of throwing", () => {
+    expect(checkinFloor("not-a-period", TODAY)).toBe(ROLLING);
+    expect(checkinFloor("2026-13", TODAY)).toBe(ROLLING);
   });
 });
