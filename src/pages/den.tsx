@@ -1,5 +1,5 @@
 import { Copy } from "lucide-react";
-import { useCallback, useMemo } from "react";
+import { useCallback, useEffect, useMemo } from "react";
 import { Link } from "react-router";
 import { toast } from "sonner";
 import Ticker from "@/components/den/ticker";
@@ -7,6 +7,8 @@ import TodayStrip from "@/components/den/today-strip";
 import { ErrorPanel } from "@/components/error-panel";
 import InstallHint from "@/components/install-hint";
 import { colorFor } from "@/components/partner-dot";
+import Pup from "@/components/pup/pup";
+import { usePupMood } from "@/components/pup/pup-mood-context";
 import { Button } from "@/components/ui/button";
 import { useDen } from "@/data/den-context";
 import { sendHeart } from "@/data/goal-mutations";
@@ -16,6 +18,7 @@ import { usePartnerActivity } from "@/hooks/use-partner-activity";
 import { useResolvedTheme } from "@/hooks/use-resolved-theme";
 import { useToday } from "@/hooks/use-today";
 import { type Goal, MAX_MEMBERS, type Member, type TickerItem } from "@/lib/domain";
+import { derivePersistentMood } from "@/lib/mood";
 import { type DenData, denView } from "@/lib/views";
 
 function WaitingForPartner({ code }: { code: string }) {
@@ -77,7 +80,25 @@ function DenContent({
 }) {
   const theme = useResolvedTheme();
   const ctx = useMemo(() => ({ coupleId, me: view.me, refresh }), [coupleId, view.me, refresh]);
-  const habitToggle = useHabitToggle(ctx);
+  const { trigger, setPersistent } = usePupMood();
+  const onStamped = useCallback(() => trigger("happy"), [trigger]);
+  const habitToggle = useHabitToggle(ctx, onStamped);
+
+  // Persistent mood from the couple's activity and the local clock; re-derived
+  // every minute so "evening" flips without waiting for a fetch.
+  useEffect(() => {
+    const derive = () =>
+      setPersistent(
+        derivePersistentMood({
+          lastCheckInAt: view.lastCheckInAt,
+          todayCount: view.todayCount,
+          now: new Date(),
+        }),
+      );
+    derive();
+    const id = window.setInterval(derive, 60_000);
+    return () => window.clearInterval(id);
+  }, [view.lastCheckInAt, view.todayCount, setPersistent]);
 
   const onPartnerStamp = useCallback(
     (item: TickerItem, member: Member) =>
@@ -86,7 +107,10 @@ function DenContent({
       }),
     [theme],
   );
-  const onHeart = useCallback(() => toast("Your partner sent you a heart"), []);
+  const onHeart = useCallback(() => {
+    toast("Your partner sent you a heart");
+    trigger("love");
+  }, [trigger]);
   usePartnerActivity(view, { onPartnerStamp, onHeart });
 
   const heart = useCallback(
@@ -106,11 +130,11 @@ function DenContent({
   return (
     <section className="page-wrap py-6 sm:py-10">
       <InstallHint />
-      <div
-        className="island-shell mb-6 flex min-h-[280px] items-center justify-center p-6"
-        id="pup-stage-slot"
-      >
-        <p className="m-0 text-muted-foreground text-sm">{pup} is on the way (Task 11).</p>
+      <div className="island-shell mb-6 overflow-hidden p-2 sm:p-4">
+        <Pup name={pup} />
+        <p className="m-0 pb-2 text-center text-muted-foreground text-xs">
+          Tap {pup} for a boop, drag to turn them around.
+        </p>
       </div>
       {view.members.length < MAX_MEMBERS && inviteCode ? (
         <WaitingForPartner code={inviteCode} />

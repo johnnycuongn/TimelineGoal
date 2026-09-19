@@ -10,6 +10,9 @@ import MilestoneCard from "@/components/goals/milestone-card";
 import NewGoalDialog from "@/components/goals/new-goal-dialog";
 import PeriodPicker from "@/components/goals/period-picker";
 import SealDialog from "@/components/goals/seal-dialog";
+import Confetti from "@/components/pup/confetti";
+import Pup from "@/components/pup/pup";
+import { usePupMood } from "@/components/pup/pup-mood-context";
 import { Button } from "@/components/ui/button";
 import { useDen } from "@/data/den-context";
 import { archiveGoal, sealGoal, stamp, undoLastMilestonePaw } from "@/data/goal-mutations";
@@ -21,12 +24,14 @@ import {
   type Goal,
   HORIZONS,
   type Horizon,
+  isSealed,
   type MilestoneHorizon,
   SHARED_OWNER,
 } from "@/lib/domain";
 import { parentCandidates } from "@/lib/goals";
+import { computeProgress } from "@/lib/ladder";
 import { horizonOfPeriod, isValidPeriod, periodFor } from "@/lib/periods";
-import { type TimelineData, timelineView } from "@/lib/views";
+import { type TimelineData, timelineView, toLite } from "@/lib/views";
 
 function isHorizon(value: string | null): value is Horizon {
   return value !== null && (HORIZONS as readonly string[]).includes(value);
@@ -48,7 +53,11 @@ export default function TimelinePage() {
     () => ({ coupleId: me.couple.id, me: me.userId, refresh }),
     [me.couple.id, me.userId, refresh],
   );
-  const habitToggle = useHabitToggle(ctx);
+  const { trigger } = usePupMood();
+  const [burst, setBurst] = useState(0);
+  const pupName = data?.couple.pupName ?? "your pup";
+  const onStamped = useCallback(() => trigger("happy"), [trigger]);
+  const habitToggle = useHabitToggle(ctx, onStamped);
 
   const [sealGoalId, setSealGoalId] = useState<string | null>(null);
   const [editing, setEditing] = useState<Goal | null>(null);
@@ -83,14 +92,36 @@ export default function TimelinePage() {
   const stampMilestone = useCallback(
     (goal: Goal) =>
       runGoalAction(goal, async () => {
-        await stamp({
+        if (!data) {
+          return;
+        }
+        const active = data.goals.filter((g) => g.archivedAt === null);
+        const lite = toLite(data);
+        const before = computeProgress(active, lite, today)[goal.id]?.complete ?? false;
+        const day = localDayKey();
+        const { created } = await stamp({
           coupleId: me.couple.id,
           goalId: goal.id,
           uid: me.userId,
-          day: localDayKey(),
+          day,
         });
+        if (!created) {
+          return;
+        }
+        const after =
+          computeProgress(active, [...lite, { goalId: goal.id, uid: me.userId, day }], today)[
+            goal.id
+          ]?.complete ?? false;
+        if (after && !before && (goal.horizon === "quarter" || goal.horizon === "year")) {
+          trigger("proud");
+        } else if (after && !before) {
+          trigger("party");
+          setBurst((b) => b + 1);
+        } else {
+          trigger("happy");
+        }
       }),
-    [runGoalAction, me.couple.id, me.userId],
+    [runGoalAction, data, today, me.couple.id, me.userId, trigger],
   );
   const undoMilestone = useCallback(
     (goal: Goal) =>
@@ -114,9 +145,20 @@ export default function TimelinePage() {
   const seal = useCallback(
     async (goal: Goal) => {
       await sealGoal(goal.id, me.userId, me.couple.id);
-      await refresh();
+      const fresh = await refresh();
+      const updated = fresh?.goals.find((g) => g.id === goal.id);
+      if (
+        updated &&
+        isSealed(
+          updated,
+          (fresh?.members ?? []).map((m) => m.id),
+        )
+      ) {
+        trigger("party");
+        setBurst((b) => b + 1);
+      }
     },
-    [me.userId, me.couple.id, refresh],
+    [me.userId, me.couple.id, refresh, trigger],
   );
   const openSeal = useCallback((goal: Goal) => setSealGoalId(goal.id), []);
   const onSealOpenChange = useCallback((open: boolean) => {
@@ -191,6 +233,10 @@ export default function TimelinePage() {
         <Button disabled={viewingMemory} onClick={openDialog} type="button">
           <Plus /> New {h === "day" ? "habit" : "goal"}
         </Button>
+      </div>
+      <div className="island-shell relative mb-6 overflow-hidden p-2">
+        <Pup className="h-[200px] sm:h-[240px]" name={pupName} />
+        <Confetti burst={burst} />
       </div>
       <HorizonTabs onChange={setHorizon} value={h} />
 
