@@ -133,11 +133,8 @@ function DenContent({
   return (
     <section className="page-wrap py-6 sm:py-10">
       <InstallHint />
-      <div className="island-shell mb-6 overflow-hidden p-2 sm:p-4">
+      <div className="mb-6">
         <Pup name={pup} />
-        <p className="m-0 pb-2 text-center text-muted-foreground text-xs">
-          Tap {pup} for a boop, drag to turn them around.
-        </p>
       </div>
       {view.members.length < MAX_MEMBERS && inviteCode ? (
         <WaitingForPartner code={inviteCode} />
