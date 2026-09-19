@@ -2,6 +2,8 @@
 
 Small taps, big dreams, one pup. A goals app for exactly two people: daily habits, monthly / quarterly / yearly milestones that climb toward each other, share-code pairing, and a realistic animated 3D bulldog puppy that cheers every paw print. Installable on iPhone as a PWA.
 
+Sibling: the TimelineGoal mobile app (Expo + Firebase) is the `sdk54-expo-go` branch of the same GitHub repo; this web app is the `web` branch.
+
 Spec: `docs/superpowers/specs/2026-09-17-timelinegoal-web-design.md`. Plan: `docs/superpowers/plans/2026-09-18-couplegoal-supabase-pwa.md`.
 
 ## Stack

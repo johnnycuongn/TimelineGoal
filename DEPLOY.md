@@ -11,7 +11,7 @@ you only need to *log in* to them (see "Prerequisites").
 
 | Piece | Where | Notes |
 | --- | --- | --- |
-| Code | GitHub `johnnycuongn/CoupleGoal` (private), branch `main` | The local folder tracks `origin/main`. GitHub is a backup only; **pushing does not deploy**. |
+| Code | GitHub `johnnycuongn/TimelineGoal` (public), branch `web` | Same repo as the TimelineGoal mobile app (Expo + Firebase, branch `sdk54-expo-go`); this web app lives on the `web` branch. Local `main` tracks `origin/web`, so a plain `git push` goes there. GitHub is a backup only; **pushing does not deploy**. |
 | Hosting | Vercel project `couplegoal`, personal scope, Hobby plan | Production alias `couplegoal-navy.vercel.app`. Linked from this folder via the git-ignored `.vercel/` directory. |
 | Env vars on Vercel | `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY` (production + preview), `CRON_SECRET` (production) | `vercel env ls` shows names only. The two `VITE_` values are public by design; `CRON_SECRET` is the only secret and only Vercel's scheduler ever holds it. |
 | Cron | `vercel.json` → `/api/keepalive` every third day at 03:00 UTC | Pings Supabase so the free project never pauses for inactivity. Attached to production deploys only. |
@@ -48,7 +48,7 @@ Run from `~/Software/Projects/CoupleGoal`:
     npm run build     # Same build Vercel runs. Must finish with "files generated".
     git add <the files you changed>
     git commit -m "What changed and why"
-    git push          # backup to GitHub; does not deploy
+    git push          # to the web branch of TimelineGoal on GitHub; does not deploy
     npx vercel --prod --yes   # builds and publishes to couplegoal-navy.vercel.app
 
 `vercel --prod` prints a unique deployment URL and then `Aliased https://couplegoal-navy.vercel.app`.
