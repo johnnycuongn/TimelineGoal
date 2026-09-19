@@ -172,7 +172,13 @@
 
 /* Dialogs become bottom sheets on phones. Unlayered on purpose: Tailwind's
    utilities layer outranks @layer components, so a layered rule here would lose
-   to the positioning and width utilities DialogContent carries. */
+   to the positioning and width utilities DialogContent carries.
+
+   The translate reset stands alone, and has to: Tailwind's -translate-x-1/2 is the
+   `translate` property, and Lightning CSS — which Tailwind runs over the bundle on
+   build — folds `translate: none` into a `transform: none` sitting beside it. The pair
+   minified down to `transform: none`, so the sheet kept the centering translate and
+   shipped half a screen off to the left. src/styles.test.ts holds that line. */
 @media (max-width: 639px) {
   [data-slot="dialog-content"] {
     top: auto;
@@ -180,7 +186,6 @@
     left: 0;
     right: 0;
     translate: none;
-    transform: none;
     width: 100%;
     max-width: 100%;
     max-height: 90dvh;
