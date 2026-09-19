@@ -18,16 +18,30 @@ const LIVE_TABLES = [
 ] as const;
 
 /**
- * One SWR entry per couple and year, kept fresh three ways: Realtime rows for
- * this couple, focus/visibility revalidation (an iPhone PWA coming back from
- * the background), and a slow interval as the safety net.
+ * The Realtime contract for this den. Read this before adding or removing a listener.
+ *
+ * Arrives live (one debounced refetch, SETTLE_MS after the event):
+ *   - INSERT and UPDATE on all six tables above, filtered to this couple on
+ *     `couple_id` (`id` for `couples`).
+ *   - DELETE on `checkins`, deliberately *unfiltered*. Supabase does not apply RLS
+ *     to DELETE events, and with RLS enabled and `replica identity full` the `old`
+ *     record carries the primary key(s) alone — no `couple_id` for a filter to match,
+ *     so a filtered delete listener would never fire and a partner's undo would sit
+ *     on screen as a paw that no longer exists. The payload is only an id, which is
+ *     all a refetch needs. The price is that another couple's undo also costs us one
+ *     refetch, and that we see their bare check-in ids (no content); the app reads
+ *     nothing out of the payload.
+ *   - A check-in is the only row this app ever deletes (undo). Goals are archived,
+ *     seals and hearts are forever, members and couples are never removed.
+ *
+ * Relies on the 60 s fallback: nothing. FALLBACK_REFRESH_MS and focus revalidation
+ * are the safety net for a dropped socket, not the delivery path for any change.
  */
-export function useCoupleData(coupleId: string, today: string) {
+export function useCoupleData(coupleId: string, fromDay: string) {
   const { userId } = useAuth();
-  const year = today.slice(0, 4);
   const swr = useSWR<CoupleData>(
-    ["couple", coupleId, year],
-    () => fetchCoupleData(coupleId, `${year}-01-01`),
+    ["couple", coupleId, fromDay],
+    () => fetchCoupleData(coupleId, fromDay),
     {
       refreshInterval: FALLBACK_REFRESH_MS,
       revalidateOnFocus: true,
@@ -39,6 +53,26 @@ export function useCoupleData(coupleId: string, today: string) {
 
   useEffect(() => {
     const channel = supabase.channel(`couple:${coupleId}`);
+    // Sticky across a collapsed burst: a members row arriving with a stamp must
+    // still revalidate who-am-I, whichever event lands last.
+    let alsoMe = false;
+    const queue = (touchesMe: boolean) => {
+      alsoMe = alsoMe || touchesMe;
+      // Bursts (a stamp plus its reaction) collapse into one refetch.
+      if (timer.current !== null) {
+        window.clearTimeout(timer.current);
+      }
+      timer.current = window.setTimeout(() => {
+        timer.current = null;
+        const refreshMe = alsoMe;
+        alsoMe = false;
+        void mutate();
+        if (refreshMe && userId) {
+          void mutateGlobal(["me", userId]);
+        }
+      }, SETTLE_MS);
+    };
+
     for (const live of LIVE_TABLES) {
       channel.on(
         "postgres_changes",
@@ -48,21 +82,13 @@ export function useCoupleData(coupleId: string, today: string) {
           table: live.table,
           filter: `${live.column}=eq.${coupleId}`,
         },
-        () => {
-          // Bursts (a stamp plus its reaction) collapse into one refetch.
-          if (timer.current !== null) {
-            window.clearTimeout(timer.current);
-          }
-          timer.current = window.setTimeout(() => {
-            timer.current = null;
-            void mutate();
-            if (live.me && userId) {
-              void mutateGlobal(["me", userId]);
-            }
-          }, SETTLE_MS);
-        },
+        () => queue(live.me),
       );
     }
+    // Unfiltered on purpose — see the Realtime contract above.
+    channel.on("postgres_changes", { event: "DELETE", schema: "public", table: "checkins" }, () =>
+      queue(false),
+    );
     channel.subscribe();
     return () => {
       if (timer.current !== null) {
