@@ -44,7 +44,9 @@ export default function TimelinePage() {
     void refresh();
   }, [refresh]);
 
-  if (error) {
+  // Only a cold failure blanks the page: with keepPreviousData a failed background
+  // revalidation (a phone off Wi-Fi for a second) must not throw away a warm Timeline.
+  if (error && !data) {
     return <ErrorPanel error={error} />;
   }
   if (!data) {

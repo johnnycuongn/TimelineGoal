@@ -34,7 +34,9 @@ function RequireSession() {
 /** Signed-in users with a den. Provides `me` (with a non-null couple) to pages. */
 function RequireDen() {
   const { me, error, isLoading, refresh } = useMe();
-  if (error) {
+  // Data first, as in SignedOutOnly: `me` stays in the SWR cache, so a failed background
+  // revalidation must not blank a working den — only a cold who-am-I failure shows the panel.
+  if (error && !me) {
     return <ErrorPanel error={error} />;
   }
   if (isLoading || !me) {
