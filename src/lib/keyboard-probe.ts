@@ -1,6 +1,7 @@
 // TEMPORARY diagnostic, opt-in via ?kbdebug=1. Prints what the keyboard is actually
 // doing to the viewport on a real phone, because iOS is the one place we cannot drive
 // a software keyboard from a test. Delete once the bottom-sheet bug is understood.
+import { stageHealth } from "@/components/pup/stage-health";
 import { keyboardInset } from "@/lib/keyboard-inset";
 
 const TICK_MS = 250;
@@ -57,6 +58,9 @@ export function startKeyboardProbe(): void {
       `cssvar ${cssVar || "(unset)"}`,
       rect ? `sheet  top=${Math.round(rect.top)} bot=${Math.round(rect.bottom)}` : "sheet  none",
       `focus  ${focused}`,
+      `webgl  ${String(stageHealth().webgl)} canvas=${document.querySelectorAll("canvas").length}`,
+      `stage  ${stageHealth().stageError ?? "ok"}`,
+      `reduce ${String(window.matchMedia("(prefers-reduced-motion: reduce)").matches)} dpr=${window.devicePixelRatio}`,
     ].join("\n");
   };
   draw();

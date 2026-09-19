@@ -109,8 +109,14 @@ describe("no toast prints a raw error", () => {
     expect(offenders(RAW_TOAST)).toEqual([]);
   });
 
-  test("the diagnostics panel is the only place that shows an error verbatim", () => {
+  test("only the diagnostics surfaces show an error verbatim", () => {
     // error-panel.tsx prints the message in a <pre> under friendly prose, on purpose.
-    expect(offenders(RAW_MESSAGE)).toEqual(["../components/error-panel.tsx"]);
+    // stage-health.ts keeps the reason the 3D pup fell back, for the console and the
+    // ?kbdebug overlay. Neither reaches a user who has not gone looking: the pup's own
+    // fallback copy stays "napping (3D isn't available here)".
+    expect(offenders(RAW_MESSAGE)).toEqual([
+      "../components/error-panel.tsx",
+      "../components/pup/stage-health.ts",
+    ]);
   });
 });

@@ -2,6 +2,7 @@ import { Dog } from "lucide-react";
 import { useReducedMotion } from "motion/react";
 import { Component, lazy, type ReactNode, Suspense, useState } from "react";
 import { cn } from "@/lib/utils";
+import { recordStageError, recordWebgl } from "./stage-health";
 
 const PupStage = lazy(() => import("./pup-stage"));
 
@@ -14,6 +15,10 @@ class StageBoundary extends Component<{ fallback: ReactNode; children: ReactNode
 
   static getDerivedStateFromError(): BoundaryState {
     return { failed: true };
+  }
+
+  override componentDidCatch(error: unknown) {
+    recordStageError(error);
   }
 
   override render() {
@@ -39,9 +44,11 @@ function supportsWebGL(): boolean {
       const gl = probe.getContext("webgl2");
       gl?.getExtension("WEBGL_lose_context")?.loseContext();
       webglOk = gl !== null;
-    } catch {
+    } catch (error) {
+      recordStageError(error);
       webglOk = false;
     }
+    recordWebgl(webglOk);
   }
   return webglOk;
 }
