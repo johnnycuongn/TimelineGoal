@@ -11,7 +11,7 @@ function stamperLabel(mine: boolean, done: boolean, name: string): string {
   if (mine) {
     return done ? "Undo today's paw" : "Stamp today's paw";
   }
-  return done ? `${name} stamped today` : `${name} hasn't stamped yet`;
+  return done ? `${name} stamped today` : `Waiting for ${name}'s paw`;
 }
 
 function StamperRow({
@@ -49,7 +49,7 @@ function StamperRow({
         style={{
           borderColor: color,
           background: done ? color : "transparent",
-          color: done ? "#fff" : color,
+          color: done ? "var(--primary-foreground)" : color,
         }}
         transition={springs.press}
         type="button"
@@ -114,10 +114,10 @@ export default function HabitCard({
       />
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <h3 className="display-title m-0 truncate text-lg">
+          <h2 className="display-title m-0 truncate text-lg">
             {goal.charm ? <span className="mr-1.5">{goal.charm}</span> : null}
             {goal.title}
-          </h3>
+          </h2>
           <p className="m-0 text-muted-foreground text-xs">
             {shared ? "Together" : owner?.displayName}
             {streak}

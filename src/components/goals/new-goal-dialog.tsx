@@ -20,6 +20,7 @@ import {
   type Member,
   SHARED_OWNER,
 } from "@/lib/domain";
+import { friendlyError } from "@/lib/errors";
 
 const HORIZON_HINT: Record<Horizon, string> = {
   day: "A habit that shows up every day. One paw per person per day.",
@@ -153,7 +154,7 @@ export default function NewGoalDialog({
         onCreated(goal);
         onOpenChange(false);
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Could not save the goal.");
+        setError(friendlyError(err));
       } finally {
         setBusy(false);
       }

@@ -9,7 +9,10 @@ const buttonVariants = cva(
     variants: {
       variant: {
         default: "bg-primary text-primary-foreground active:scale-[0.96]",
-        secondary: "bg-secondary text-secondary-foreground active:scale-[0.96]",
+        // White on the light-theme pink is 3.52:1, so the ink is the dark one in each
+        // theme: foreground on #ec4899 is 4.69:1, secondary-foreground on #f9a8d4 is 9:1.
+        secondary:
+          "bg-secondary text-foreground active:scale-[0.96] dark:text-secondary-foreground",
         outline: "border border-border bg-card text-foreground active:scale-[0.96]",
         ghost: "text-foreground hover:bg-muted active:scale-[0.96]",
       },

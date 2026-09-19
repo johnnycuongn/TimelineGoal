@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useDen } from "@/data/den-context";
 import { mintInviteCode, updateCouple, updateMember } from "@/data/mutations";
+import { copyWithToast } from "@/lib/clipboard";
 import { localDayKey } from "@/lib/day";
 import {
   DISPLAY_NAME_MAX,
@@ -17,6 +18,7 @@ import {
   type PartnerColorKey,
   PUP_NAME_MAX,
 } from "@/lib/domain";
+import { friendlyError } from "@/lib/errors";
 import { daysBetween } from "@/lib/periods";
 
 const NAMES_NEEDED = "Your pup and you both need a name before we can save.";
@@ -38,7 +40,7 @@ export default function UsPage() {
         await refresh();
         toast(done);
       } catch (err) {
-        toast.error(err instanceof Error ? err.message : "Could not save.");
+        toast.error(friendlyError(err));
       } finally {
         setBusy(false);
       }
@@ -84,8 +86,7 @@ export default function UsPage() {
     [],
   );
   const copyCode = useCallback(() => {
-    void navigator.clipboard.writeText(couple.inviteCode ?? "");
-    toast("Code copied");
+    void copyWithToast(couple.inviteCode ?? "", "Code copied");
   }, [couple.inviteCode]);
   const mintCode = useCallback(() => {
     void save(async () => {
@@ -196,7 +197,7 @@ export default function UsPage() {
           <p>
             "Bulldog Puppy" by{" "}
             <a
-              className="underline"
+              className="focus-ring rounded-sm underline"
               href="https://sketchfab.com/3d-models/bulldog-puppy-7081c9c27df244bf84774361888f58a2"
               rel="noopener noreferrer"
               target="_blank"
@@ -205,7 +206,7 @@ export default function UsPage() {
             </a>
             , licensed under{" "}
             <a
-              className="underline"
+              className="focus-ring rounded-sm underline"
               href="https://creativecommons.org/licenses/by/4.0/"
               rel="noopener noreferrer"
               target="_blank"
@@ -217,7 +218,7 @@ export default function UsPage() {
           <p>
             Skeleton and animations from the Ultimate Animated Animal Pack by{" "}
             <a
-              className="underline"
+              className="focus-ring rounded-sm underline"
               href="https://quaternius.com"
               rel="noopener noreferrer"
               target="_blank"

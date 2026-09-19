@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label";
 import { createDen, joinDen, updateCouple } from "@/data/mutations";
 import type { Me } from "@/data/queries";
 import { useMe } from "@/data/use-me";
+import { copyWithToast } from "@/lib/clipboard";
 import {
   DEFAULT_COLOR_A,
   DISPLAY_NAME_MAX,
@@ -18,6 +19,7 @@ import {
   type PartnerColorKey,
   PUP_NAME_MAX,
 } from "@/lib/domain";
+import { friendlyError } from "@/lib/errors";
 import { isValidShareCode, normalizeShareCode } from "@/lib/share-code";
 
 type Step = "choose" | "waiting" | "name";
@@ -80,7 +82,7 @@ function PairFlow({
     try {
       await work();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong.");
+      setError(friendlyError(err));
     } finally {
       setBusy(false);
     }
@@ -119,7 +121,7 @@ function PairFlow({
       event.preventDefault();
       void run(async () => {
         if (!me.couple) {
-          throw new Error("You are not in a den yet.");
+          throw new Error("We haven't found your den yet.");
         }
         await updateCouple(me.couple.id, { pupName });
         await refresh();
@@ -139,7 +141,7 @@ function PairFlow({
     [],
   );
   const copyCode = useCallback(() => {
-    void navigator.clipboard.writeText(inviteCode);
+    void copyWithToast(inviteCode, "Code copied");
   }, [inviteCode]);
   const goToDen = useCallback(() => navigate("/den"), [navigate]);
 

@@ -13,6 +13,18 @@ export function TabsList({ className, ...props }: ComponentProps<typeof TabsPrim
   );
 }
 
+export function TabsContent({ className, ...props }: ComponentProps<typeof TabsPrimitive.Content>) {
+  return (
+    <TabsPrimitive.Content
+      className={cn(
+        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+        className,
+      )}
+      {...props}
+    />
+  );
+}
+
 export function TabsTrigger({ className, ...props }: ComponentProps<typeof TabsPrimitive.Trigger>) {
   return (
     <TabsPrimitive.Trigger

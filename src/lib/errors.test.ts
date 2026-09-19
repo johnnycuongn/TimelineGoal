@@ -24,6 +24,18 @@ describe("friendlyError", () => {
     );
   });
 
+  test("reads an offline failure through postgrest's re-shaped error", () => {
+    const offline = "We couldn't reach the den. Check your connection and try again.";
+    // What postgrest-js hands the client when the fetch itself never leaves the phone.
+    expect(friendlyError({ message: "TypeError: Failed to fetch", details: "", code: "" })).toBe(
+      offline,
+    );
+    expect(friendlyError({ message: "FetchError: fetch failed" })).toBe(offline);
+    // Safari says "Load failed" instead, and node-fetch names the error rather than the message.
+    expect(friendlyError({ message: "TypeError: Load failed" })).toBe(offline);
+    expect(friendlyError({ name: "FetchError", message: "request to ... failed" })).toBe(offline);
+  });
+
   test("passes a database rule's own wording straight through", () => {
     expect(friendlyError({ message: "That code isn't waiting for anyone." })).toBe(
       "That code isn't waiting for anyone.",

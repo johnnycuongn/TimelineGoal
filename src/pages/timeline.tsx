@@ -238,42 +238,42 @@ export default function TimelinePage() {
         <Pup className="h-[200px] sm:h-[240px]" name={pupName} />
         <Confetti burst={burst} />
       </div>
-      <HorizonTabs onChange={setHorizon} value={h} />
-
-      {h === "day" ? (
-        <div className="mt-6 grid gap-4 sm:grid-cols-2">
-          {habits.length === 0 ? (
-            <p className="text-muted-foreground text-sm">
-              No habits yet. Add the first small thing you'll do every day.
-            </p>
-          ) : null}
-          {[...mine, ...theirs].map((goal) => (
-            <HabitCard
-              busy={habitToggle.busy.has(goal.id)}
-              goal={goal}
-              key={goal.id}
-              me={view.me}
-              members={view.members}
-              menu={<GoalMenu goal={goal} onArchive={archive} onEdit={edit} />}
-              onToggle={habitToggle.toggle}
-              state={habitToggle.view(goal.id, view.habits[goal.id])}
-            />
-          ))}
-        </div>
-      ) : (
-        <MilestoneSection
-          busyGoal={busyGoal}
-          data={view}
-          horizon={h}
-          onArchive={archive}
-          onEdit={edit}
-          onSeal={openSeal}
-          onStamp={stampMilestone}
-          onUndo={undoMilestone}
-          period={period}
-          setPeriod={setPeriod}
-        />
-      )}
+      <HorizonTabs onChange={setHorizon} value={h}>
+        {h === "day" ? (
+          <div className="mt-6 grid gap-4 sm:grid-cols-2">
+            {habits.length === 0 ? (
+              <p className="text-muted-foreground text-sm">
+                No habits yet. Add the first small thing you'll do every day.
+              </p>
+            ) : null}
+            {[...mine, ...theirs].map((goal) => (
+              <HabitCard
+                busy={habitToggle.busy.has(goal.id)}
+                goal={goal}
+                key={goal.id}
+                me={view.me}
+                members={view.members}
+                menu={<GoalMenu goal={goal} onArchive={archive} onEdit={edit} />}
+                onToggle={habitToggle.toggle}
+                state={habitToggle.view(goal.id, view.habits[goal.id])}
+              />
+            ))}
+          </div>
+        ) : (
+          <MilestoneSection
+            busyGoal={busyGoal}
+            data={view}
+            horizon={h}
+            onArchive={archive}
+            onEdit={edit}
+            onSeal={openSeal}
+            onStamp={stampMilestone}
+            onUndo={undoMilestone}
+            period={period}
+            setPeriod={setPeriod}
+          />
+        )}
+      </HorizonTabs>
 
       <SealDialog
         goal={sealGoalLive}
@@ -338,7 +338,7 @@ function MilestoneSection({
       {goals.length === 0 ? (
         <p className="text-muted-foreground text-sm">
           {readOnly
-            ? "Nothing here from back then."
+            ? "Nothing was written down for this stretch."
             : "No goals for this stretch yet. Dream a little?"}
         </p>
       ) : (

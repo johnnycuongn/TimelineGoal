@@ -1,8 +1,7 @@
 import { Heart } from "lucide-react";
 import { motion, useReducedMotion } from "motion/react";
 import { useCallback } from "react";
-import PartnerDot, { colorFor } from "@/components/partner-dot";
-import { useResolvedTheme } from "@/hooks/use-resolved-theme";
+import PartnerDot from "@/components/partner-dot";
 import type { Member, TickerItem } from "@/lib/domain";
 import { springs } from "@/lib/motion";
 
@@ -29,12 +28,8 @@ function HeartsOnMine({ count }: { count: number }) {
   if (count === 0) {
     return null;
   }
-  return (
-    <Heart
-      aria-label={`${count} heart from your partner`}
-      className="size-5 fill-primary text-primary"
-    />
-  );
+  const label = count === 1 ? "A heart from your partner" : `${count} hearts from your partner`;
+  return <Heart aria-label={label} className="size-5 fill-primary text-primary" role="img" />;
 }
 
 function TickerRow({
@@ -50,18 +45,23 @@ function TickerRow({
   now: Date;
   onHeart: (item: TickerItem) => void;
 }) {
-  const theme = useResolvedTheme();
   const reduced = useReducedMotion();
   const mine = item.uid === me;
   const hearted = Boolean(item.reactions[me]);
-  const onClick = useCallback(() => onHeart(item), [onHeart, item]);
+  // aria-disabled, not disabled: a heart already sent stays focusable so a keyboard
+  // reader can still reach the row and hear that it landed.
+  const onClick = useCallback(() => {
+    if (!hearted) {
+      onHeart(item);
+    }
+  }, [hearted, onHeart, item]);
   return (
     <li className="flex items-center gap-3">
       <PartnerDot color={member.color} label={member.displayName} />
       <p className="m-0 min-w-0 flex-1 text-sm">
-        <span className="font-semibold" style={{ color: colorFor(member.color, theme) }}>
-          {mine ? "You" : member.displayName}
-        </span>
+        {/* The dot carries the colour: teal, tangerine, lime and sky all fall under
+            4.5:1 as 14px ink on the light background, and pass 3:1 as a filled dot. */}
+        <span className="font-semibold">{mine ? "You" : member.displayName}</span>
         {" stamped "}
         <span className="font-semibold">
           {item.charm ? `${item.charm} ` : ""}
@@ -76,11 +76,11 @@ function TickerRow({
           aria-label={hearted ? "You sent a heart" : `Send ${member.displayName} a heart`}
           aria-pressed={hearted}
           className="flex size-11 items-center justify-center rounded-full text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          disabled={hearted}
+          aria-disabled={hearted}
           onClick={onClick}
           transition={springs.bouncy}
           type="button"
-          whileTap={reduced ? undefined : { scale: 1.3 }}
+          whileTap={reduced || hearted ? undefined : { scale: 1.3 }}
         >
           <Heart className="size-5" fill={hearted ? "currentColor" : "none"} />
         </motion.button>

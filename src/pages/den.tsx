@@ -17,14 +17,14 @@ import { useHabitToggle } from "@/hooks/use-habit-toggle";
 import { usePartnerActivity } from "@/hooks/use-partner-activity";
 import { useResolvedTheme } from "@/hooks/use-resolved-theme";
 import { useToday } from "@/hooks/use-today";
+import { copyWithToast } from "@/lib/clipboard";
 import { type Goal, MAX_MEMBERS, type Member, type TickerItem } from "@/lib/domain";
 import { derivePersistentMood } from "@/lib/mood";
 import { type DenData, denView } from "@/lib/views";
 
 function WaitingForPartner({ code }: { code: string }) {
   const copy = useCallback(() => {
-    void navigator.clipboard.writeText(code);
-    toast("Code copied");
+    void copyWithToast(code, "Code copied");
   }, [code]);
   return (
     <section className="island-shell mb-6 flex flex-wrap items-center gap-3 p-4">
@@ -54,7 +54,7 @@ function WaitingForMySeal({ goals }: { goals: Goal[] }) {
         {goals.map((g) => (
           <li key={g.id}>
             <Link
-              className="inline-flex min-h-11 items-center underline"
+              className="focus-ring inline-flex min-h-11 items-center rounded-md underline"
               to={`/goals?h=${g.horizon}`}
             >
               {g.charm ? `${g.charm} ` : ""}

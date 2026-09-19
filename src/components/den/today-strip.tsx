@@ -21,7 +21,7 @@ export default function TodayStrip({
     return (
       <p className="text-muted-foreground text-sm">
         No daily habits yet.{" "}
-        <Link className="underline" to="/goals?h=day">
+        <Link className="focus-ring rounded-sm underline" to="/goals?h=day">
           Add one on the Timeline
         </Link>
         .

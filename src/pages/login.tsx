@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { friendlyError } from "@/lib/errors";
 
 const PASSWORD_MIN = 6;
 
@@ -41,7 +42,7 @@ export default function LoginPage() {
         // /pair forwards fully paired couples to the Den.
         navigate("/pair", { replace: true });
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Something went wrong.");
+        setError(friendlyError(err));
       } finally {
         setBusy(false);
       }

@@ -88,7 +88,7 @@ export default function SealDialog({
                     ? { scale: [1.4, 1], rotate: [-8, 0], opacity: 1 }
                     : { scale: 1, opacity: 0.3 }
                 }
-                className="flex size-20 items-center justify-center rounded-full text-white"
+                className="flex size-20 items-center justify-center rounded-full text-primary-foreground"
                 initial={false}
                 key={m.id}
                 style={{ background: colorFor(m.color, theme) }}

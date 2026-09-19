@@ -1,6 +1,6 @@
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { X } from "lucide-react";
-import type { ComponentProps } from "react";
+import { type ComponentProps, useCallback, useRef } from "react";
 import { cn } from "@/lib/utils";
 
 export const Dialog = DialogPrimitive.Root;
@@ -11,6 +11,29 @@ export function DialogContent({
   children,
   ...props
 }: ComponentProps<typeof DialogPrimitive.Content>) {
+  // Every dialog here is opened from page state, not from a DialogTrigger, so Radix's
+  // own close handler has no trigger to focus and a keyboard user lands back on <body>.
+  // The open event fires before focus moves in, so it can record where to return to.
+  const opener = useRef<HTMLElement | null>(null);
+  const onOpenAutoFocus = useCallback(
+    (event: Event) => {
+      opener.current = document.activeElement as HTMLElement | null;
+      props.onOpenAutoFocus?.(event);
+    },
+    [props.onOpenAutoFocus],
+  );
+  const onCloseAutoFocus = useCallback(
+    (event: Event) => {
+      props.onCloseAutoFocus?.(event);
+      const back = opener.current;
+      if (!event.defaultPrevented && back?.isConnected) {
+        // Skips Radix's triggerRef.focus(), which would be a no-op here.
+        event.preventDefault();
+        back.focus();
+      }
+    },
+    [props.onCloseAutoFocus],
+  );
   return (
     <DialogPrimitive.Portal>
       <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/40 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
@@ -21,6 +44,8 @@ export function DialogContent({
         )}
         data-slot="dialog-content"
         {...props}
+        onCloseAutoFocus={onCloseAutoFocus}
+        onOpenAutoFocus={onOpenAutoFocus}
       >
         {children}
         <DialogPrimitive.Close

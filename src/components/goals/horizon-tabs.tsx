@@ -1,5 +1,5 @@
-import { useCallback } from "react";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { type ReactNode, useCallback } from "react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { HORIZONS, type Horizon } from "@/lib/domain";
 
 const LABELS: Record<Horizon, string> = {
@@ -16,9 +16,11 @@ function isHorizon(value: string): value is Horizon {
 export default function HorizonTabs({
   value,
   onChange,
+  children,
 }: {
   value: Horizon;
   onChange: (h: Horizon) => void;
+  children: ReactNode;
 }) {
   const onValueChange = useCallback(
     (v: string) => {
@@ -37,6 +39,9 @@ export default function HorizonTabs({
           </TabsTrigger>
         ))}
       </TabsList>
+      {/* The active trigger's aria-controls has to point at something: only the panel
+          for the current horizon is mounted, so this is the one that must exist. */}
+      <TabsContent value={value}>{children}</TabsContent>
     </Tabs>
   );
 }

@@ -19,7 +19,7 @@ export default function PartnerDot({
   return (
     <span
       aria-label={label}
-      className="inline-flex shrink-0 items-center justify-center rounded-full font-heading text-white text-xs"
+      className="inline-flex shrink-0 items-center justify-center rounded-full font-heading text-primary-foreground text-xs"
       role="img"
       style={{ width: size, height: size, background: colorFor(color, theme) }}
     >

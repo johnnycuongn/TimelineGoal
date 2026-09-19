@@ -130,6 +130,10 @@
     @apply font-heading font-semibold tracking-[-0.01em];
     text-wrap: balance;
   }
+  /* Button carries its own ring; links and bare controls use this one. */
+  .focus-ring {
+    @apply outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background;
+  }
   .nav-link {
     @apply relative inline-flex min-h-11 items-center px-1 text-muted-foreground no-underline;
   }

@@ -13,12 +13,12 @@ export const NAV = [
 ] as const;
 
 function navClass({ isActive }: { isActive: boolean }): string {
-  return cn("nav-link font-semibold text-sm", isActive && "is-active");
+  return cn("nav-link focus-ring rounded-md font-semibold text-sm", isActive && "is-active");
 }
 
 function tabClass({ isActive }: { isActive: boolean }): string {
   return cn(
-    "flex min-h-11 flex-1 flex-col items-center justify-center gap-0.5 rounded-2xl text-xs font-semibold",
+    "focus-ring flex min-h-11 flex-1 flex-col items-center justify-center gap-0.5 rounded-2xl text-xs font-semibold",
     isActive ? "text-primary" : "text-muted-foreground",
   );
 }
@@ -50,7 +50,7 @@ export default function AppShell({
       <header className="safe-top sticky top-0 z-40 border-border border-b bg-background/90 px-4 backdrop-blur-lg">
         <nav className="page-wrap flex items-center gap-3 py-2">
           <NavLink
-            className="inline-flex min-h-11 items-center gap-2 font-heading text-foreground text-xl no-underline"
+            className="focus-ring inline-flex min-h-11 items-center gap-2 rounded-md font-heading text-foreground text-xl no-underline"
             to="/"
           >
             <PawPrint aria-hidden="true" className="size-5 text-primary" />
@@ -78,7 +78,7 @@ export default function AppShell({
       {showNav ? (
         <nav
           aria-label="Main"
-          className="tab-bar fixed inset-x-0 bottom-0 z-40 flex items-start gap-1 border-border border-t bg-background/95 px-2 pt-1 backdrop-blur-lg md:hidden"
+          className="tab-bar fixed inset-x-0 bottom-0 z-40 flex items-start gap-2 border-border border-t bg-background/95 px-2 pt-1 backdrop-blur-lg md:hidden"
         >
           {NAV.map((item) => (
             <NavLink className={tabClass} key={item.to} to={item.to}>
