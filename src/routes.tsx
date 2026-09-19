@@ -7,6 +7,7 @@ import { useMe } from "@/data/use-me";
 import LandingPage from "@/pages/landing";
 import LoginPage from "@/pages/login";
 import PairPage from "@/pages/pair";
+import TimelinePage from "@/pages/timeline";
 import UsPage from "@/pages/us";
 
 function Loading() {
@@ -106,7 +107,7 @@ export const router = createBrowserRouter([
                 element: <RequireDen />,
                 children: [
                   { path: "/den", element: <Placeholder title="Den" /> },
-                  { path: "/goals", element: <Placeholder title="Timeline" /> },
+                  { path: "/goals", element: <TimelinePage /> },
                   { path: "/us", element: <UsPage /> },
                 ],
               },
