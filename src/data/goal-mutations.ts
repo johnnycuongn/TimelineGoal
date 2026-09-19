@@ -1,4 +1,4 @@
-import type { Goal, GoalInput } from "@/lib/domain";
+import type { Goal, GoalInput, Horizon } from "@/lib/domain";
 import { SHARED_OWNER } from "@/lib/domain";
 import { friendlyError, isDuplicate } from "@/lib/errors";
 import { periodFor } from "@/lib/periods";
@@ -57,6 +57,8 @@ export async function updateGoal(
     charm?: string | null;
     targetUnits?: number;
     parentGoalId?: string | null;
+    /** `null` brings a tucked-away goal back; the archive toast's undo uses it. */
+    archivedAt?: string | null;
   },
 ): Promise<void> {
   const row: {
@@ -64,6 +66,7 @@ export async function updateGoal(
     charm?: string | null;
     target_units?: number;
     parent_goal_id?: string | null;
+    archived_at?: string | null;
   } = {};
   if (patch.title !== undefined) {
     row.title = patch.title.trim();
@@ -76,6 +79,9 @@ export async function updateGoal(
   }
   if (patch.parentGoalId !== undefined) {
     row.parent_goal_id = patch.parentGoalId;
+  }
+  if (patch.archivedAt !== undefined) {
+    row.archived_at = patch.archivedAt;
   }
   const { error } = await supabase.from("goals").update(row).eq("id", goalId);
   if (error) {
@@ -103,19 +109,25 @@ export async function sealGoal(goalId: string, uid: string, coupleId: string): P
   }
 }
 
-/** Stamp a paw. A second habit paw on the same day is reported, not thrown. */
+/**
+ * Stamp a paw. A second habit paw on the same day is reported, not thrown.
+ * `horizon` is the goal's own: `checkins_validate` overwrites the column anyway, but
+ * sending "day" for a milestone would collide on the daily unique index the moment
+ * that assignment moved, and `isDuplicate` would swallow the stamp as "already done".
+ */
 export async function stamp(args: {
   coupleId: string;
   goalId: string;
   uid: string;
   day: string;
+  horizon: Horizon;
 }): Promise<{ created: boolean }> {
   const { error } = await supabase.from("checkins").insert({
     couple_id: args.coupleId,
     goal_id: args.goalId,
     user_id: args.uid,
     day: args.day,
-    horizon: "day",
+    horizon: args.horizon,
   });
   if (error) {
     if (isDuplicate(error)) {

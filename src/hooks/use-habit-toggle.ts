@@ -38,6 +38,7 @@ export function useHabitToggle(
             goalId: goal.id,
             uid: ctx.me,
             day,
+            horizon: goal.horizon,
           });
           if (created) {
             onStamped?.();

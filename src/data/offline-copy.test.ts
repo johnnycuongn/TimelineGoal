@@ -37,7 +37,7 @@ describe("an unreachable den", () => {
 
   test("stamping a paw offline says so in the pup's voice", async () => {
     await expect(
-      stamp({ coupleId: COUPLE_ID, goalId: GOAL_ID, uid: USER_ID, day: DAY }),
+      stamp({ coupleId: COUPLE_ID, goalId: GOAL_ID, uid: USER_ID, day: DAY, horizon: "day" }),
     ).rejects.toThrow(OFFLINE);
   });
 
