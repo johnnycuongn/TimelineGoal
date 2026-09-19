@@ -6,6 +6,7 @@ import { Toaster } from "sonner";
 import { AuthProvider } from "@/auth/auth-provider";
 import { PupMoodProvider } from "@/components/pup/pup-mood-context";
 import { watchKeyboardInset } from "@/lib/keyboard-inset";
+import { startKeyboardProbe } from "@/lib/keyboard-probe";
 import { router } from "@/routes";
 import "@/styles.css";
 
@@ -14,6 +15,11 @@ import "@/styles.css";
 watchKeyboardInset(window, (px) => {
   document.documentElement.style.setProperty("--keyboard-inset", `${px}px`);
 });
+
+// TEMPORARY: ?kbdebug=1 draws the live viewport numbers over the app. Off otherwise.
+if (new URLSearchParams(window.location.search).has("kbdebug")) {
+  startKeyboardProbe();
+}
 
 const root = document.getElementById("root");
 if (!root) {
