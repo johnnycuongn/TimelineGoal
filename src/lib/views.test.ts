@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 import type { CheckIn, CoupleData, Goal } from "./domain";
-import { denView, timelineView } from "./views";
+import { denView, pupActivity, timelineView } from "./views";
 
 const A = "a";
 const B = "b";
@@ -71,6 +71,29 @@ const data: CoupleData = {
     checkin("1", "walk", A, "2026-09-16", "2026-09-16T08:00:00.000Z"),
   ],
 };
+
+describe("pupActivity", () => {
+  test("the newest check-in and how many landed today", () => {
+    expect(pupActivity(data, "2026-09-17")).toEqual({
+      lastCheckInAt: "2026-09-17T09:00:00.000Z",
+      todayCount: 2,
+    });
+  });
+
+  test("a day with nothing stamped counts none, and still reports the last one", () => {
+    expect(pupActivity(data, "2026-09-18")).toEqual({
+      lastCheckInAt: "2026-09-17T09:00:00.000Z",
+      todayCount: 0,
+    });
+  });
+
+  test("a page still fetching gets nulls rather than a crash", () => {
+    expect(pupActivity(undefined, "2026-09-17")).toEqual({
+      lastCheckInAt: null,
+      todayCount: 0,
+    });
+  });
+});
 
 describe("denView", () => {
   test("shapes habits, states, ticker, seals, counts", () => {

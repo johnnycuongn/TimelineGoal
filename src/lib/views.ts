@@ -47,6 +47,22 @@ export function activeGoals(data: CoupleData): Goal[] {
   return data.goals.filter((g) => g.archivedAt === null);
 }
 
+/**
+ * The two facts the pup's mood is derived from. Split out of denView because every page
+ * that shows the pup needs them, and the rest of the den's view is no use to the others.
+ */
+export function pupActivity(
+  data: CoupleData | undefined,
+  today: string,
+): { lastCheckInAt: string | null; todayCount: number } {
+  // Undefined while a page is still fetching. Nulls are the honest answer, and bedtime
+  // — the one mood that asks nothing of the couple's history — still comes through.
+  return {
+    lastCheckInAt: data?.checkins[0]?.at ?? null,
+    todayCount: data?.checkins.filter((c) => c.day === today).length ?? 0,
+  };
+}
+
 export function denView(data: CoupleData, me: string, today: string): DenData {
   const goals = activeGoals(data);
   const habits = goals.filter((g) => g.horizon === "day");
@@ -76,8 +92,7 @@ export function denView(data: CoupleData, me: string, today: string): DenData {
     waitingForMySeal: goals.filter(
       (g) => g.owner === SHARED_OWNER && g.horizon !== "day" && !g.seals[me],
     ),
-    lastCheckInAt: data.checkins[0]?.at ?? null,
-    todayCount: data.checkins.filter((c) => c.day === today).length,
+    ...pupActivity(data, today),
     members: data.members,
     me,
     today,

@@ -13,6 +13,7 @@ import SealDialog from "@/components/goals/seal-dialog";
 import Confetti from "@/components/pup/confetti";
 import Pup from "@/components/pup/pup";
 import { usePupMood } from "@/components/pup/pup-mood-context";
+import { usePersistentMood } from "@/components/pup/use-persistent-mood";
 import StaggerItem from "@/components/stagger-item";
 import { Button } from "@/components/ui/button";
 import { useDen } from "@/data/den-context";
@@ -40,7 +41,7 @@ import { friendlyError } from "@/lib/errors";
 import { parentCandidates } from "@/lib/goals";
 import { computeProgress } from "@/lib/ladder";
 import { checkinFloor, horizonOfPeriod, isValidPeriod, periodFor } from "@/lib/periods";
-import { type TimelineData, timelineView, toLite } from "@/lib/views";
+import { pupActivity, type TimelineData, timelineView, toLite } from "@/lib/views";
 
 function isHorizon(value: string | null): value is Horizon {
   return value !== null && (HORIZONS as readonly string[]).includes(value);
@@ -68,6 +69,8 @@ export default function TimelinePage() {
     [me.couple.id, me.userId, refresh],
   );
   const { trigger } = usePupMood();
+  // The timeline shows the pup too, so it needs the clock as much as the den does.
+  usePersistentMood(pupActivity(data, today));
   const [burst, setBurst] = useState(0);
   const pupName = data?.couple.pupName ?? "your pup";
   const onStamped = useCallback(() => trigger("happy"), [trigger]);

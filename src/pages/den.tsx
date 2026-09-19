@@ -1,5 +1,5 @@
 import { Copy } from "lucide-react";
-import { useCallback, useEffect, useMemo } from "react";
+import { useCallback, useMemo } from "react";
 import { Link } from "react-router";
 import { toast } from "sonner";
 import Ticker from "@/components/den/ticker";
@@ -9,6 +9,7 @@ import InstallHint from "@/components/install-hint";
 import { colorFor } from "@/components/partner-dot";
 import Pup from "@/components/pup/pup";
 import { usePupMood } from "@/components/pup/pup-mood-context";
+import { usePersistentMood } from "@/components/pup/use-persistent-mood";
 import { Button } from "@/components/ui/button";
 import { useDen } from "@/data/den-context";
 import { sendHeart } from "@/data/goal-mutations";
@@ -21,7 +22,6 @@ import { useToday } from "@/hooks/use-today";
 import { copyWithToast } from "@/lib/clipboard";
 import { type Goal, MAX_MEMBERS, type Member, type TickerItem } from "@/lib/domain";
 import { friendlyError } from "@/lib/errors";
-import { derivePersistentMood } from "@/lib/mood";
 import { checkinFloor } from "@/lib/periods";
 import { type DenData, denView } from "@/lib/views";
 
@@ -83,25 +83,12 @@ function DenContent({
 }) {
   const theme = useResolvedTheme();
   const ctx = useMemo(() => ({ coupleId, me: view.me, refresh }), [coupleId, view.me, refresh]);
-  const { trigger, setPersistent } = usePupMood();
+  const { trigger } = usePupMood();
   const onStamped = useCallback(() => trigger("happy"), [trigger]);
   const habitToggle = useHabitToggle(ctx, onStamped);
 
-  // Persistent mood from the couple's activity and the local clock; re-derived
-  // every minute so "evening" flips without waiting for a fetch.
-  useEffect(() => {
-    const derive = () =>
-      setPersistent(
-        derivePersistentMood({
-          lastCheckInAt: view.lastCheckInAt,
-          todayCount: view.todayCount,
-          now: new Date(),
-        }),
-      );
-    derive();
-    const id = window.setInterval(derive, 60_000);
-    return () => window.clearInterval(id);
-  }, [view.lastCheckInAt, view.todayCount, setPersistent]);
+  // Persistent mood from the couple's activity and the local clock.
+  usePersistentMood(view);
 
   const onPartnerStamp = useCallback(
     (item: TickerItem, member: Member) =>

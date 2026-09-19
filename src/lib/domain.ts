@@ -5,7 +5,16 @@ export const HORIZONS = ["day", "month", "quarter", "year"] as const;
 export type Horizon = (typeof HORIZONS)[number];
 export type MilestoneHorizon = Exclude<Horizon, "day">;
 
-export type Mood = "idle" | "happy" | "party" | "proud" | "sleepy" | "pout" | "love";
+export type Mood =
+  | "idle"
+  | "happy"
+  | "party"
+  | "proud"
+  | "sleepy"
+  | "pout"
+  | "love"
+  | "drowsy"
+  | "resting";
 
 /**
  * The spec's partner palette, plus the ink that goes *on* each swatch.
