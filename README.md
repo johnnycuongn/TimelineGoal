@@ -24,11 +24,13 @@ Two accounts are needed to try pairing: sign up twice (any email; confirmations 
 
 ## Supabase
 
-- Project `couplegoal` (ref `uosxptayqdetgbyercqt`), region `ap-southeast-2`. Migrations `0001`–`0006` are applied to it; `0006` is the security-advisor hardening. Auth: email + password with **Confirm email off** (Authentication → Sign In / Providers → Email). Magic links would open in Safari rather than the installed app, so there are none.
+- Project `couplegoal` (ref `uosxptayqdetgbyercqt`), region `ap-southeast-2`. Migrations `0001`–`0007` are applied to it; `0006` is the security-advisor hardening, `0007` the post-review fixes. Auth: email + password with **Confirm email off** (Authentication → Sign In / Providers → Email). Magic links would open in Safari rather than the installed app, so there are none.
 - Schema changes: add a numbered file to `supabase/migrations/`, apply it (Supabase MCP `apply_migration`, or `npx supabase link` + `npx supabase db push`), regenerate `src/lib/database.types.ts`, run the RLS probe.
 - The publishable key ships in the browser on purpose; RLS is what protects rows. Never put a `sb_secret_` / `service_role` key in this repo, in `.env.local`, or on Vercel: nothing here needs one.
 
 ## Deploy
+
+Step-by-step, including prerequisites and what is already set up: `DEPLOY.md`.
 
     vercel deploy --target=preview   # a preview URL; nothing becomes public
     vercel --prod                    # the public production URL
