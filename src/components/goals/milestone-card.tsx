@@ -5,11 +5,15 @@ import { colorFor } from "@/components/partner-dot";
 import { Button } from "@/components/ui/button";
 import { useResolvedTheme } from "@/hooks/use-resolved-theme";
 import { type Goal, isSealed, type Member, SHARED_OWNER } from "@/lib/domain";
+import { isTask } from "@/lib/goals";
 import { filledPaws, type GoalProgress } from "@/lib/ladder";
 
 const PERCENT = 100;
 
 function childLabel(child: Goal, cp: GoalProgress | undefined): string {
+  if (isTask(child)) {
+    return "one-off";
+  }
   if (child.horizon === "day") {
     return "daily habit";
   }
@@ -29,6 +33,7 @@ export default function MilestoneCard({
   members,
   me,
   readOnly,
+  notYet = false,
   busy = false,
   onStamp,
   onSeal,
@@ -42,6 +47,8 @@ export default function MilestoneCard({
   members: Member[];
   me: string;
   readOnly: boolean;
+  /** The stretch of time hasn't come round yet: plan it, seal it, but don't stamp it. */
+  notYet?: boolean;
   busy?: boolean;
   onStamp: (goal: Goal) => void;
   onSeal: (goal: Goal) => void;
@@ -56,7 +63,11 @@ export default function MilestoneCard({
     : colorFor(owner?.color ?? "rose", theme);
   const pawColor = shared ? (gradient[0] ?? "") : colorFor(owner?.color ?? "rose", theme);
   const canStamp =
-    !readOnly && (shared || goal.owner === me) && progress !== undefined && !progress.complete;
+    !readOnly &&
+    !notYet &&
+    (shared || goal.owner === me) &&
+    progress !== undefined &&
+    !progress.complete;
   const sealed = isSealed(
     goal,
     members.map((m) => m.id),
@@ -117,6 +128,9 @@ export default function MilestoneCard({
               style={{ width: `${percent}%`, background: accent }}
             />
           </div>
+          {notYet ? (
+            <p className="m-0 text-muted-foreground text-xs">Not yet — its time hasn't come.</p>
+          ) : null}
           {progress.ladder > 0 ? (
             <p className="m-0 text-muted-foreground text-xs">
               {progress.ladder.toFixed(1)} paw{progress.ladder === 1 ? "" : "s"} climbed up from

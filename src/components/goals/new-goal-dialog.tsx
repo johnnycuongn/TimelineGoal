@@ -1,4 +1,4 @@
-import { type ChangeEvent, type FormEvent, useCallback, useEffect, useState } from "react";
+import { type ChangeEvent, type FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -21,17 +21,26 @@ import {
   SHARED_OWNER,
 } from "@/lib/domain";
 import { friendlyError } from "@/lib/errors";
-import { periodFor } from "@/lib/periods";
+import { parentCandidates } from "@/lib/goals";
+import { dayLabel, periodLabel } from "@/lib/periods";
 
 const HORIZON_HINT: Record<Horizon, string> = {
   day: "A habit that shows up every day. One paw per person per day.",
-  month: "A milestone for this month, filled with paw prints.",
-  quarter: "A bigger milestone for this quarter.",
-  year: "The dream for this year.",
+  month: "A milestone for a month, filled with paw prints.",
+  quarter: "A bigger milestone for a quarter.",
+  year: "The dream for a year.",
 };
+const TASK_HINT = "One thing, on the day you choose. A paw each when it's done.";
 // UTF-16 units, not glyphs: a ZWJ family emoji is 8 units.
 const CHARM_INPUT_MAX = 16;
 const DEFAULT_TARGET = 3;
+
+function kindWord(horizon: Horizon, dated: boolean): string {
+  if (horizon !== "day") {
+    return "goal";
+  }
+  return dated ? "one-off" : "habit";
+}
 
 function submitLabel(editing: boolean, sealsOnCreate: boolean): string {
   if (editing) {
@@ -50,7 +59,8 @@ export default function NewGoalDialog({
   horizon,
   members,
   me,
-  parents,
+  goals,
+  period,
   open,
   onOpenChange,
   onCreated,
@@ -61,7 +71,10 @@ export default function NewGoalDialog({
   horizon: Horizon;
   members: Member[];
   me: string;
-  parents: Goal[];
+  /** Every active goal, so the dialog can offer the parents that fit the date chosen. */
+  goals: Goal[];
+  /** The stretch of time on screen. null on the Day tab, where the date is chosen here. */
+  period: string | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onCreated: (goal: Goal) => void;
@@ -74,6 +87,7 @@ export default function NewGoalDialog({
   const [owner, setOwner] = useState<string>(me);
   const [target, setTarget] = useState(DEFAULT_TARGET);
   const [parentGoalId, setParentGoalId] = useState("");
+  const [taskDay, setTaskDay] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -91,6 +105,7 @@ export default function NewGoalDialog({
       setOwner(editing.owner);
       setTarget(editing.targetUnits ?? DEFAULT_TARGET);
       setParentGoalId(editing.parentGoalId ?? "");
+      setTaskDay(editing.horizon === "day" ? (editing.period ?? "") : "");
       return;
     }
     setTitle("");
@@ -98,6 +113,7 @@ export default function NewGoalDialog({
     setOwner(me);
     setTarget(DEFAULT_TARGET);
     setParentGoalId("");
+    setTaskDay("");
   }, [editing, me]);
 
   const onTitle = useCallback((e: ChangeEvent<HTMLInputElement>) => setTitle(e.target.value), []);
@@ -110,6 +126,18 @@ export default function NewGoalDialog({
   const onParent = useCallback(
     (e: ChangeEvent<HTMLSelectElement>) => setParentGoalId(e.target.value),
     [],
+  );
+  const onTaskDay = useCallback(
+    (e: ChangeEvent<HTMLInputElement>) => setTaskDay(e.target.value),
+    [],
+  );
+
+  // On the Day tab a goal is a habit until a date is given; a date makes it a one-off.
+  const goalPeriod = horizon === "day" ? taskDay || null : period;
+  // Parents follow the date: a goal for next March climbs toward next March's goals.
+  const parents = useMemo(
+    () => parentCandidates(goals, horizon, goalPeriod, ctx.today),
+    [goals, horizon, goalPeriod, ctx.today],
   );
   const close = useCallback(() => onOpenChange(false), [onOpenChange]);
 
@@ -143,7 +171,7 @@ export default function NewGoalDialog({
             title,
             charm: charm || null,
             horizon,
-            period: horizon === "day" ? null : periodFor(horizon, ctx.today),
+            period: goalPeriod,
             owner,
             targetUnits: horizon === "day" ? null : target,
             parentGoalId: parentGoalId || null,
@@ -152,6 +180,7 @@ export default function NewGoalDialog({
         setTitle("");
         setCharm("");
         setParentGoalId("");
+        setTaskDay("");
         onCreated(goal);
         onOpenChange(false);
       } catch (err) {
@@ -165,6 +194,7 @@ export default function NewGoalDialog({
       title,
       charm,
       horizon,
+      goalPeriod,
       owner,
       target,
       parentGoalId,
@@ -183,9 +213,12 @@ export default function NewGoalDialog({
       <DialogContent>
         <DialogHeader>
           <DialogTitle>
-            {editing ? "Edit" : "New"} {horizon === "day" ? "habit" : "goal"}
+            {editing ? "Edit" : "New"} {kindWord(horizon, goalPeriod !== null)}
           </DialogTitle>
-          <DialogDescription>{HORIZON_HINT[horizon]}</DialogDescription>
+          <DialogDescription>
+            {horizon === "day" && goalPeriod !== null ? TASK_HINT : HORIZON_HINT[horizon]}
+            {horizon === "day" || period === null ? "" : ` For ${periodLabel(period)}.`}
+          </DialogDescription>
         </DialogHeader>
         <form className="space-y-4" onSubmit={submit}>
           <div className="grid grid-cols-[minmax(0,1fr)_5.5rem] gap-3">
@@ -226,7 +259,23 @@ export default function NewGoalDialog({
               <option value={SHARED_OWNER}>Ours, together</option>
             </NativeSelect>
           </div>
-          {horizon === "day" ? null : (
+          {horizon === "day" ? (
+            <div className="space-y-2">
+              <Label htmlFor="goal-day">On a day (optional)</Label>
+              {editing ? (
+                <p className="m-0 text-sm">
+                  {editing.period ? dayLabel(editing.period, ctx.today) : "Every day"}
+                </p>
+              ) : (
+                <>
+                  <Input id="goal-day" onChange={onTaskDay} type="date" value={taskDay} />
+                  <p className="m-0 text-muted-foreground text-xs">
+                    Leave this empty for something you'll do every day.
+                  </p>
+                </>
+              )}
+            </div>
+          ) : (
             <div className="space-y-2">
               <Label htmlFor="goal-target">Paw prints to fill</Label>
               <Input

@@ -10,6 +10,7 @@ import MilestoneCard from "@/components/goals/milestone-card";
 import NewGoalDialog from "@/components/goals/new-goal-dialog";
 import PeriodPicker from "@/components/goals/period-picker";
 import SealDialog from "@/components/goals/seal-dialog";
+import TaskCard from "@/components/goals/task-card";
 import Confetti from "@/components/pup/confetti";
 import Pup from "@/components/pup/pup";
 import { usePupMood } from "@/components/pup/pup-mood-context";
@@ -38,9 +39,15 @@ import {
   SHARED_OWNER,
 } from "@/lib/domain";
 import { friendlyError } from "@/lib/errors";
-import { parentCandidates } from "@/lib/goals";
+import { isHabit } from "@/lib/goals";
 import { computeProgress } from "@/lib/ladder";
-import { checkinFloor, horizonOfPeriod, isValidPeriod, periodFor } from "@/lib/periods";
+import {
+  canPlanPeriod,
+  checkinFloor,
+  horizonOfPeriod,
+  isValidPeriod,
+  periodFor,
+} from "@/lib/periods";
 import { pupActivity, type TimelineData, timelineView, toLite } from "@/lib/views";
 
 function isHorizon(value: string | null): value is Horizon {
@@ -250,19 +257,28 @@ export default function TimelinePage() {
   }
 
   const view = timelineView(data, me.userId, today);
-  const habits = view.goals.filter((g) => g.horizon === "day");
+  const habits = view.goals.filter(isHabit);
   const mine = habits.filter((g) => g.owner === view.me || g.owner === SHARED_OWNER);
   const theirs = habits.filter((g) => g.owner !== view.me && g.owner !== SHARED_OWNER);
+  // Today's and everything ahead, plus anything overdue that was never done: a one-off
+  // that slipped shouldn't vanish, and a finished one shouldn't linger.
+  const tasks = view.tasks.filter((g) => (g.period ?? "") >= today || !view.taskStates[g.id]?.done);
   // The dialog always gets the live goal, so a partner's wax arriving by Realtime
   // fills the second seal while the dialog is open.
   const sealGoalLive = sealGoalId ? (view.goals.find((g) => g.id === sealGoalId) ?? null) : null;
-  // The same rule MilestoneSection applies: a period from the URL only counts on
-  // its own tab and never in the future, so the button matches what is on screen.
+  // The period on screen is the period a new goal belongs to. The Day tab has no picker:
+  // there, a habit has no period and a one-off picks its own date in the dialog.
+  const currentPeriod = h === "day" ? null : periodFor(h, today);
+  const viewedPeriod =
+    h === "day" ||
+    period === undefined ||
+    horizonOfPeriod(period) !== h ||
+    !canPlanPeriod(period, today)
+      ? currentPeriod
+      : period;
+  // A memory is finished and cannot be rewritten. Everything else -- now and ahead -- can.
   const viewingMemory =
-    h !== "day" &&
-    period !== undefined &&
-    horizonOfPeriod(period) === h &&
-    period < periodFor(h, today);
+    viewedPeriod !== null && currentPeriod !== null && viewedPeriod < currentPeriod;
 
   return (
     <section className="page-wrap py-6 sm:py-10">
@@ -281,25 +297,49 @@ export default function TimelinePage() {
       </div>
       <HorizonTabs onChange={setHorizon} value={h}>
         {h === "day" ? (
-          <div className="mt-6 grid gap-4 sm:grid-cols-2">
-            {habits.length === 0 ? (
-              <p className="text-muted-foreground text-sm">
-                No habits yet. Add the first small thing you'll do every day.
-              </p>
+          <div className="mt-6">
+            <p className="island-kicker mb-3">Every day</p>
+            <div className="grid gap-4 sm:grid-cols-2">
+              {habits.length === 0 ? (
+                <p className="text-muted-foreground text-sm">
+                  No habits yet. Add the first small thing you'll do every day.
+                </p>
+              ) : null}
+              {[...mine, ...theirs].map((goal, index) => (
+                <StaggerItem index={index} key={goal.id}>
+                  <HabitCard
+                    busy={habitToggle.busy.has(goal.id)}
+                    goal={goal}
+                    me={view.me}
+                    members={view.members}
+                    menu={<GoalMenu goal={goal} onArchive={archive} onEdit={edit} />}
+                    onToggle={habitToggle.toggle}
+                    state={habitToggle.view(goal.id, view.habits[goal.id])}
+                  />
+                </StaggerItem>
+              ))}
+            </div>
+            {tasks.length > 0 ? (
+              <div className="mt-8">
+                <p className="island-kicker mb-3">On a day</p>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  {tasks.map((goal, index) => (
+                    <StaggerItem index={index} key={goal.id}>
+                      <TaskCard
+                        busy={habitToggle.busy.has(goal.id)}
+                        goal={goal}
+                        me={view.me}
+                        members={view.members}
+                        menu={<GoalMenu goal={goal} onArchive={archive} onEdit={edit} />}
+                        onToggle={habitToggle.toggle}
+                        state={view.taskStates[goal.id]}
+                        today={today}
+                      />
+                    </StaggerItem>
+                  ))}
+                </div>
+              </div>
             ) : null}
-            {[...mine, ...theirs].map((goal, index) => (
-              <StaggerItem index={index} key={goal.id}>
-                <HabitCard
-                  busy={habitToggle.busy.has(goal.id)}
-                  goal={goal}
-                  me={view.me}
-                  members={view.members}
-                  menu={<GoalMenu goal={goal} onArchive={archive} onEdit={edit} />}
-                  onToggle={habitToggle.toggle}
-                  state={habitToggle.view(goal.id, view.habits[goal.id])}
-                />
-              </StaggerItem>
-            ))}
           </div>
         ) : (
           <MilestoneSection
@@ -311,7 +351,7 @@ export default function TimelinePage() {
             onSeal={openSeal}
             onStamp={stampMilestone}
             onUndo={undoMilestone}
-            period={period}
+            period={viewedPeriod}
             setPeriod={setPeriod}
           />
         )}
@@ -335,8 +375,9 @@ export default function TimelinePage() {
         onCreated={onCreated}
         onOpenChange={onDialogOpenChange}
         onSaved={onSaved}
+        goals={view.goals}
         open={dialogOpen}
-        parents={parentCandidates(view.goals, h, null, today)}
+        period={viewedPeriod}
       />
     </section>
   );
@@ -356,7 +397,7 @@ function MilestoneSection({
 }: {
   data: TimelineData;
   horizon: MilestoneHorizon;
-  period: string | undefined;
+  period: string | null;
   setPeriod: (p: string) => void;
   busyGoal: string | null;
   onStamp: (g: Goal) => void;
@@ -366,22 +407,28 @@ function MilestoneSection({
   onArchive: (g: Goal) => void;
 }) {
   const current = periodFor(horizon, data.today);
-  // A period from the URL only counts if it belongs to this tab and is not in the future.
-  const viewPeriod =
-    period && horizonOfPeriod(period) === horizon && period <= current ? period : current;
-  const readOnly = viewPeriod !== current;
+  const viewPeriod = period ?? current;
+  // A memory is finished and cannot be rewritten. A plan can be written, edited and
+  // sealed — it just cannot be stamped until its time comes round.
+  const isMemory = viewPeriod < current;
+  const notYet = viewPeriod > current;
   const goals = data.goals.filter((g) => g.horizon === horizon && g.period === viewPeriod);
   const byId = new Map(data.goals.map((g) => [g.id, g]));
   return (
     <div className="mt-6">
       <div className="mb-4 flex items-center justify-between">
-        <PeriodPicker current={current} onChange={setPeriod} period={viewPeriod} />
+        <PeriodPicker
+          current={current}
+          onChange={setPeriod}
+          period={viewPeriod}
+          today={data.today}
+        />
       </div>
       {goals.length === 0 ? (
         <p className="text-muted-foreground text-sm">
-          {readOnly
-            ? "Nothing was written down for this stretch."
-            : "No goals for this stretch yet. Dream a little?"}
+          {isMemory ? "Nothing was written down for this stretch." : null}
+          {notYet ? "Nothing planned yet. What do you want this stretch to hold?" : null}
+          {!(isMemory || notYet) ? "No goals for this stretch yet. Dream a little?" : null}
         </p>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2">
@@ -396,7 +443,7 @@ function MilestoneSection({
                   me={data.me}
                   members={data.members}
                   menu={
-                    readOnly ? undefined : (
+                    isMemory ? undefined : (
                       <GoalMenu
                         canUndo={
                           (progress?.own ?? 0) > 0 &&
@@ -413,8 +460,9 @@ function MilestoneSection({
                   onStamp={onStamp}
                   parent={goal.parentGoalId ? byId.get(goal.parentGoalId) : undefined}
                   progress={progress}
+                  notYet={notYet}
                   progressById={data.progress}
-                  readOnly={readOnly}
+                  readOnly={isMemory}
                 />
               </StaggerItem>
             );

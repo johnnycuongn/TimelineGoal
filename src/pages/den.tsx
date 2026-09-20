@@ -135,6 +135,9 @@ function DenContent({
           me={view.me}
           members={view.members}
           states={view.habitStates}
+          taskStates={view.taskStates}
+          tasks={view.todayTasks}
+          today={view.today}
           toggle={habitToggle}
         />
       </div>

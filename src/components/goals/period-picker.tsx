@@ -1,20 +1,32 @@
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useCallback } from "react";
 import { Button } from "@/components/ui/button";
-import { periodLabel, shiftPeriod } from "@/lib/periods";
+import { canPlanPeriod, periodLabel, shiftPeriod } from "@/lib/periods";
+
+function note(period: string, current: string): string | null {
+  if (period === current) {
+    return null;
+  }
+  return period < current ? "memory" : "ahead";
+}
 
 export default function PeriodPicker({
   period,
   current,
+  today,
   onChange,
 }: {
   period: string;
   current: string;
+  today: string;
   onChange: (period: string) => void;
 }) {
-  const isCurrent = period === current;
   const earlier = useCallback(() => onChange(shiftPeriod(period, -1)), [onChange, period]);
   const later = useCallback(() => onChange(shiftPeriod(period, 1)), [onChange, period]);
+  // Looking back is unbounded — every memory is worth keeping. Looking forward stops
+  // where planning turns into wandering.
+  const canGoLater = canPlanPeriod(shiftPeriod(period, 1), today);
+  const mark = note(period, current);
   return (
     <div className="flex items-center gap-1">
       <Button aria-label="Earlier" onClick={earlier} size="icon" type="button" variant="ghost">
@@ -22,11 +34,11 @@ export default function PeriodPicker({
       </Button>
       <span className="min-w-[9rem] text-center font-heading text-lg">
         {periodLabel(period)}
-        {isCurrent ? null : <span className="ml-2 text-muted-foreground text-xs">memory</span>}
+        {mark ? <span className="ml-2 text-muted-foreground text-xs">{mark}</span> : null}
       </span>
       <Button
         aria-label="Later"
-        disabled={isCurrent}
+        disabled={!canGoLater}
         onClick={later}
         size="icon"
         type="button"
