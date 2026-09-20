@@ -25,6 +25,8 @@ const MONTH_NAMES = [
   "November",
   "December",
 ] as const;
+const WEEKDAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
+const SHORT_MONTH_LENGTH = 3;
 
 const pad = (n: number): string => String(n).padStart(2, "0");
 
@@ -63,6 +65,27 @@ export function isDayWithinTolerance(day: string, now: Date, toleranceDays: numb
     return false;
   }
   return Math.abs(daysBetween(dayKeyFromDate(now), day)) <= toleranceDays;
+}
+
+/** A task's day in words, relative to today wherever that reads better. */
+export function dayLabel(day: string, today: string): string {
+  const delta = daysBetween(today, day);
+  if (delta === 0) {
+    return "Today";
+  }
+  if (delta === 1) {
+    return "Tomorrow";
+  }
+  if (delta === -1) {
+    return "Yesterday";
+  }
+  const date = toUtc(day);
+  const month = MONTH_NAMES[date.getUTCMonth()]?.slice(0, SHORT_MONTH_LENGTH) ?? "";
+  const stem = `${WEEKDAY_NAMES[date.getUTCDay()]} ${date.getUTCDate()} ${month}`;
+  // The year is noise inside this year and the one thing you need across it.
+  return date.getUTCFullYear() === toUtc(today).getUTCFullYear()
+    ? stem
+    : `${stem} ${date.getUTCFullYear()}`;
 }
 
 export function periodFor(horizon: MilestoneHorizon, day: string): string {
@@ -121,6 +144,10 @@ function monthSpan(period: string): { year: number; first: number; last: number 
 }
 
 export function periodRange(period: string): { start: string; end: string } {
+  // A task's period is the single day it lands on; everything below is a milestone.
+  if (isValidDayKey(period)) {
+    return { start: period, end: period };
+  }
   const { year, first, last } = monthSpan(period);
   const start = new Date(Date.UTC(year, first - 1, 1));
   // Day 0 of the following month is the last day of `last`.
@@ -155,6 +182,10 @@ export function shiftPeriod(period: string, delta: number): string {
 }
 
 export function periodLabel(period: string): string {
+  if (isValidDayKey(period)) {
+    const date = toUtc(period);
+    return `${date.getUTCDate()} ${MONTH_NAMES[date.getUTCMonth()]} ${date.getUTCFullYear()}`;
+  }
   const horizon = horizonOfPeriod(period);
   const { year, first } = monthSpan(period);
   if (horizon === "month") {
@@ -164,6 +195,40 @@ export function periodLabel(period: string): string {
     return `Q${Math.ceil(first / MONTHS_PER_QUARTER)} ${year}`;
   }
   return String(year);
+}
+
+/** Does `outer` cover every day of `inner`? Either may be a day key or a milestone period. */
+export function periodContainsPeriod(outer: string, inner: string): boolean {
+  const o = periodRange(outer);
+  const i = periodRange(inner);
+  return o.start <= i.start && i.end <= o.end;
+}
+
+/** Signed number of periods from `from` to `to`. Both must share a horizon. */
+export function periodsBetween(from: string, to: string): number {
+  const horizon = horizonOfPeriod(from);
+  if (horizonOfPeriod(to) !== horizon) {
+    throw new Error(`Periods of different horizons: ${from}, ${to}`);
+  }
+  const a = monthSpan(from);
+  const b = monthSpan(to);
+  if (horizon === "year") {
+    return b.year - a.year;
+  }
+  const months = (b.year - a.year) * MONTHS_PER_YEAR + (b.first - a.first);
+  return horizon === "month" ? months : months / MONTHS_PER_QUARTER;
+}
+
+/**
+ * How far ahead a couple may plan: far enough for a real dream, close enough that nobody
+ * walks the picker to the year 3000 and wonders where their goals went.
+ */
+const LOOK_AHEAD: Record<MilestoneHorizon, number> = { month: 24, quarter: 8, year: 5 };
+
+/** Is `period` somewhere a goal may be written: any memory, or a bounded stretch ahead? */
+export function canPlanPeriod(period: string, today: string): boolean {
+  const horizon = horizonOfPeriod(period);
+  return periodsBetween(periodFor(horizon, today), period) <= LOOK_AHEAD[horizon];
 }
 
 export function parentHorizon(horizon: Horizon): Horizon | null {

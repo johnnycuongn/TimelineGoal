@@ -1,9 +1,11 @@
 import { describe, expect, test } from "vitest";
 import {
   CHECKIN_WINDOW_DAYS,
+  canPlanPeriod,
   checkinFloor,
   childHorizon,
   dayKeyFromDate,
+  dayLabel,
   daysBetween,
   daysElapsedInPeriod,
   horizonOfPeriod,
@@ -12,9 +14,11 @@ import {
   isValidPeriod,
   parentHorizon,
   periodContainsDay,
+  periodContainsPeriod,
   periodFor,
   periodLabel,
   periodRange,
+  periodsBetween,
   shiftDay,
   shiftPeriod,
 } from "./periods";
@@ -142,5 +146,79 @@ describe("checkinFloor", () => {
   test("a junk period falls back to the rolling window instead of throwing", () => {
     expect(checkinFloor("not-a-period", TODAY)).toBe(ROLLING);
     expect(checkinFloor("2026-13", TODAY)).toBe(ROLLING);
+  });
+});
+
+describe("day keys as periods", () => {
+  test("periodRange of a day key is that one day", () => {
+    expect(periodRange("2026-11-14")).toEqual({ start: "2026-11-14", end: "2026-11-14" });
+  });
+
+  test("periodLabel spells a day key out", () => {
+    expect(periodLabel("2026-11-14")).toBe("14 November 2026");
+  });
+
+  test("periodContainsPeriod nests a day inside its month, quarter and year", () => {
+    expect(periodContainsPeriod("2026-11", "2026-11-14")).toBe(true);
+    expect(periodContainsPeriod("2026-Q4", "2026-11-14")).toBe(true);
+    expect(periodContainsPeriod("2026", "2026-11-14")).toBe(true);
+    expect(periodContainsPeriod("2026-10", "2026-11-14")).toBe(false);
+    expect(periodContainsPeriod("2026-Q4", "2026-09")).toBe(false);
+    expect(periodContainsPeriod("2026", "2026-Q4")).toBe(true);
+  });
+
+  test("a period contains itself", () => {
+    expect(periodContainsPeriod("2026-11", "2026-11")).toBe(true);
+  });
+
+  test("periodContainsDay still answers for a day-key period", () => {
+    expect(periodContainsDay("2026-11-14", "2026-11-14")).toBe(true);
+    expect(periodContainsDay("2026-11-14", "2026-11-15")).toBe(false);
+  });
+
+  test("daysElapsedInPeriod treats a day key as a one-day period", () => {
+    expect(daysElapsedInPeriod("2026-11-14", "2026-11-13")).toBe(0);
+    expect(daysElapsedInPeriod("2026-11-14", "2026-11-14")).toBe(1);
+    expect(daysElapsedInPeriod("2026-11-14", "2026-12-01")).toBe(1);
+  });
+
+  test("a day that never happened is not a period", () => {
+    expect(() => periodRange("2026-02-30")).toThrow("Invalid period");
+  });
+});
+
+describe("planning ahead", () => {
+  test("periodsBetween counts steps of the horizon", () => {
+    expect(periodsBetween("2026-09", "2026-11")).toBe(2);
+    expect(periodsBetween("2026-11", "2026-09")).toBe(-2);
+    expect(periodsBetween("2026-Q3", "2027-Q1")).toBe(2);
+    expect(periodsBetween("2026", "2029")).toBe(3);
+  });
+
+  test("periodsBetween refuses to compare two different horizons", () => {
+    expect(() => periodsBetween("2026-09", "2026-Q3")).toThrow("different horizons");
+  });
+
+  test("canPlanPeriod allows any memory and a bounded future", () => {
+    expect(canPlanPeriod("2020-01", "2026-09-20")).toBe(true);
+    expect(canPlanPeriod("2028-09", "2026-09-20")).toBe(true);
+    expect(canPlanPeriod("2028-10", "2026-09-20")).toBe(false);
+    expect(canPlanPeriod("2028-Q3", "2026-09-20")).toBe(true);
+    expect(canPlanPeriod("2029-Q1", "2026-09-20")).toBe(false);
+    expect(canPlanPeriod("2031", "2026-09-20")).toBe(true);
+    expect(canPlanPeriod("2032", "2026-09-20")).toBe(false);
+  });
+});
+
+describe("dayLabel", () => {
+  test("names the days around today", () => {
+    expect(dayLabel("2026-09-20", "2026-09-20")).toBe("Today");
+    expect(dayLabel("2026-09-21", "2026-09-20")).toBe("Tomorrow");
+    expect(dayLabel("2026-09-19", "2026-09-20")).toBe("Yesterday");
+  });
+
+  test("gives a weekday and date further out, with the year only when it differs", () => {
+    expect(dayLabel("2026-11-14", "2026-09-20")).toBe("Sat 14 Nov");
+    expect(dayLabel("2027-01-04", "2026-09-20")).toBe("Mon 4 Jan 2027");
   });
 });
