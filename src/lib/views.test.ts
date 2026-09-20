@@ -141,3 +141,37 @@ describe("timelineView", () => {
     expect(tl.habits.walk?.streakDays).toBe(2);
   });
 });
+
+describe("one-offs in the views", () => {
+  const withTasks: CoupleData = {
+    ...data,
+    goals: [
+      ...data.goals,
+      goal({ id: "today-task", horizon: "day", period: "2026-09-17", owner: A }),
+      goal({ id: "later-task", horizon: "day", period: "2026-12-01", owner: A }),
+    ],
+  };
+
+  test("the den's habits never include a one-off", () => {
+    const den = denView(withTasks, A, "2026-09-17");
+    expect(den.habits.map((g) => g.id)).toEqual(["walk"]);
+  });
+
+  test("the den carries today's one-offs and no others", () => {
+    const den = denView(withTasks, A, "2026-09-17");
+    expect(den.todayTasks.map((g) => g.id)).toEqual(["today-task"]);
+    expect(den.taskStates["today-task"]).toEqual({ doneBy: { [A]: false }, done: false });
+  });
+
+  test("the timeline carries every one-off, in date order", () => {
+    const view = timelineView(withTasks, A, "2026-09-17");
+    expect(view.tasks.map((g) => g.id)).toEqual(["today-task", "later-task"]);
+  });
+
+  test("a one-off gets a task state and no habit state", () => {
+    const view = timelineView(withTasks, A, "2026-09-17");
+    expect(view.taskStates["today-task"]).toBeDefined();
+    expect(view.habits["today-task"]).toBeUndefined();
+    expect(view.habits.walk).toBeDefined();
+  });
+});

@@ -7,17 +7,23 @@ import {
   TICKER_LIMIT,
   type TickerItem,
 } from "./domain";
+import { isHabit, isTask } from "./goals";
 import {
   type CheckInLite,
   computeHabitStates,
   computeProgress,
+  computeTaskStates,
   type GoalProgress,
   type HabitState,
+  type TaskState,
 } from "./ladder";
 
 export interface DenData {
   habits: Goal[];
   habitStates: Record<string, HabitState>;
+  /** One-offs dated today. A one-off for next March has no business in today's strip. */
+  todayTasks: Goal[];
+  taskStates: Record<string, TaskState>;
   ticker: TickerItem[];
   /** Shared goals the viewer has not pressed their wax on yet. */
   waitingForMySeal: Goal[];
@@ -34,6 +40,9 @@ export interface TimelineData {
   checkins: CheckInLite[];
   progress: Record<string, GoalProgress>;
   habits: Record<string, HabitState>;
+  /** Every active one-off, earliest day first. */
+  tasks: Goal[];
+  taskStates: Record<string, TaskState>;
   members: Member[];
   me: string;
   today: string;
@@ -65,7 +74,7 @@ export function pupActivity(
 
 export function denView(data: CoupleData, me: string, today: string): DenData {
   const goals = activeGoals(data);
-  const habits = goals.filter((g) => g.horizon === "day");
+  const habits = goals.filter(isHabit);
   const lite = toLite(data);
   const byId = new Map(data.goals.map((g) => [g.id, g]));
   const ticker: TickerItem[] = data.checkins.slice(0, TICKER_LIMIT).map((c) => ({
@@ -86,6 +95,8 @@ export function denView(data: CoupleData, me: string, today: string): DenData {
       data.members.map((m) => m.id),
     ),
     ticker,
+    todayTasks: goals.filter((g) => g.period === today && isTask(g)),
+    taskStates: computeTaskStates(goals, lite, data.members),
     // The wax is a milestone ritual: only milestone cards offer a seal, so a shared
     // habit would sit here forever with nothing to press. The goals_autoseal trigger
     // records the creator's seal, so whoever made the goal never waits on themselves.
@@ -106,7 +117,9 @@ export function timelineView(data: CoupleData, me: string, today: string): Timel
   return {
     goals,
     checkins: lite,
-    progress: computeProgress(goals, lite, today),
+    progress: computeProgress(goals, lite, today, data.members),
+    tasks: goals.filter(isTask).sort((a, b) => (a.period ?? "").localeCompare(b.period ?? "")),
+    taskStates: computeTaskStates(goals, lite, data.members),
     habits: computeHabitStates(
       goals,
       lite,

@@ -21,6 +21,8 @@ const item = (
 const den = (ticker: TickerItem[]): DenData => ({
   habits: [],
   habitStates: {},
+  todayTasks: [],
+  taskStates: {},
   ticker,
   waitingForMySeal: [],
   lastCheckInAt: null,
