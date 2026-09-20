@@ -1,7 +1,7 @@
 import type { Goal, GoalInput, Horizon } from "@/lib/domain";
 import { SHARED_OWNER } from "@/lib/domain";
 import { friendlyError, isDuplicate } from "@/lib/errors";
-import { periodFor } from "@/lib/periods";
+import { horizonOfPeriod, isValidDayKey, isValidPeriod } from "@/lib/periods";
 import { supabase } from "@/lib/supabase";
 import { goalFromRow } from "./mappers";
 
@@ -9,14 +9,31 @@ function wrap(error: unknown): Error {
   return new Error(friendlyError(error), { cause: error });
 }
 
+/** The period a goal may carry, checked here so a typo never reaches a trigger. */
+function periodForInput(input: GoalInput): string | null {
+  if (input.horizon === "day") {
+    // No period is a habit; a day key is a one-off on that day.
+    if (input.period === null || isValidDayKey(input.period)) {
+      return input.period;
+    }
+  } else if (
+    input.period !== null &&
+    isValidPeriod(input.period) &&
+    horizonOfPeriod(input.period) === input.horizon
+  ) {
+    return input.period;
+  }
+  throw new Error("That date doesn't match the kind of goal.");
+}
+
 export async function createGoal(args: {
   coupleId: string;
   uid: string;
   input: GoalInput;
-  today: string;
 }): Promise<Goal> {
-  const { coupleId, uid, input, today } = args;
+  const { coupleId, uid, input } = args;
   const milestone = input.horizon !== "day";
+  const period = periodForInput(input);
   const { data, error } = await supabase
     .from("goals")
     .insert({
@@ -25,7 +42,7 @@ export async function createGoal(args: {
       charm: input.charm?.trim() || null,
       horizon: input.horizon,
       owner_id: input.owner === SHARED_OWNER ? null : input.owner,
-      period: input.horizon === "day" ? null : periodFor(input.horizon, today),
+      period,
       target_units: milestone ? input.targetUnits : null,
       parent_goal_id: input.parentGoalId,
       created_by: uid,

@@ -111,6 +111,8 @@ export interface GoalInput {
   title: string;
   charm: string | null;
   horizon: Horizon;
+  /** null for a daily habit; a day key for a one-off; a period for a milestone. */
+  period: string | null;
   owner: string;
   targetUnits: number | null;
   parentGoalId: string | null;

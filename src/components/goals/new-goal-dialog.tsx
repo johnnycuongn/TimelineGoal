@@ -21,6 +21,7 @@ import {
   SHARED_OWNER,
 } from "@/lib/domain";
 import { friendlyError } from "@/lib/errors";
+import { periodFor } from "@/lib/periods";
 
 const HORIZON_HINT: Record<Horizon, string> = {
   day: "A habit that shows up every day. One paw per person per day.",
@@ -138,11 +139,11 @@ export default function NewGoalDialog({
         const goal = await createGoal({
           coupleId: ctx.coupleId,
           uid: ctx.uid,
-          today: ctx.today,
           input: {
             title,
             charm: charm || null,
             horizon,
+            period: horizon === "day" ? null : periodFor(horizon, ctx.today),
             owner,
             targetUnits: horizon === "day" ? null : target,
             parentGoalId: parentGoalId || null,
