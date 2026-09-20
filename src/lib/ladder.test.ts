@@ -1,6 +1,13 @@
 import { describe, expect, test } from "vitest";
-import type { Goal } from "./domain";
-import { type CheckInLite, computeHabitStates, computeProgress, filledPaws } from "./ladder";
+import type { Goal, Member } from "./domain";
+import { SHARED_OWNER } from "./domain";
+import {
+  type CheckInLite,
+  computeHabitStates,
+  computeProgress,
+  computeTaskStates,
+  filledPaws,
+} from "./ladder";
 
 const A = "user_a";
 const B = "user_b";
@@ -123,5 +130,96 @@ describe("computeHabitStates", () => {
     expect(get(computeHabitStates(goals, three, "2026-09-17", [A]), "h").streakDays).toBe(3);
     expect(get(computeHabitStates(goals, three, "2026-09-18", [A]), "h").streakDays).toBe(3);
     expect(get(computeHabitStates(goals, three, "2026-09-19", [A]), "h").streakDays).toBe(0);
+  });
+});
+
+describe("tasks", () => {
+  const members: Member[] = [
+    { id: A, displayName: "Ann", color: "rose" },
+    { id: B, displayName: "Bo", color: "teal" },
+  ];
+
+  test("a private task is done when its owner stamps it", () => {
+    const task = goal({ id: "t", horizon: "day", period: "2026-11-14", owner: A });
+    expect(get(computeTaskStates([task], [], members), "t")).toEqual({
+      doneBy: { [A]: false },
+      done: false,
+    });
+    expect(get(computeTaskStates([task], [ci("t", A, "2026-11-14")], members), "t")).toEqual({
+      doneBy: { [A]: true },
+      done: true,
+    });
+  });
+
+  test("a shared task waits for both paws", () => {
+    const task = goal({ id: "t", horizon: "day", period: "2026-11-14", owner: SHARED_OWNER });
+    expect(get(computeTaskStates([task], [ci("t", A, "2026-11-14")], members), "t")).toEqual({
+      doneBy: { [A]: true, [B]: false },
+      done: false,
+    });
+    const both = computeTaskStates(
+      [task],
+      [ci("t", A, "2026-11-14"), ci("t", B, "2026-11-14")],
+      members,
+    );
+    expect(get(both, "t").done).toBe(true);
+  });
+
+  test("a paw on another day doesn't count", () => {
+    const task = goal({ id: "t", horizon: "day", period: "2026-11-14", owner: A });
+    const state = computeTaskStates([task], [ci("t", A, "2026-11-13")], members);
+    expect(get(state, "t").done).toBe(false);
+  });
+
+  test("an archived task has no state", () => {
+    const task = goal({
+      id: "t",
+      horizon: "day",
+      period: "2026-11-14",
+      owner: A,
+      archivedAt: "2026-11-01T00:00:00.000Z",
+    });
+    expect(computeTaskStates([task], [], members).t).toBeUndefined();
+  });
+
+  test("computeHabitStates leaves tasks alone", () => {
+    const task = goal({ id: "t", horizon: "day", period: "2026-11-14", owner: A });
+    const habit = goal({ id: "h", horizon: "day", owner: A });
+    const states = computeHabitStates([task, habit], [], "2026-11-14", [A, B]);
+    expect(states.t).toBeUndefined();
+    expect(states.h).toBeDefined();
+  });
+
+  test("a finished task is worth a whole paw to its parent, not a day of it", () => {
+    const month = goal({ id: "m", horizon: "month", period: "2026-11", targetUnits: 2 });
+    const task = goal({
+      id: "t",
+      horizon: "day",
+      period: "2026-11-14",
+      owner: A,
+      parentGoalId: "m",
+    });
+    const p = computeProgress([month, task], [ci("t", A, "2026-11-14")], "2026-11-20", members);
+    expect(get(p, "m").ladder).toBe(1);
+  });
+
+  test("a task only half done is worth nothing to its parent yet", () => {
+    const month = goal({ id: "m", horizon: "month", period: "2026-11", targetUnits: 2 });
+    const task = goal({
+      id: "t",
+      horizon: "day",
+      period: "2026-11-14",
+      owner: SHARED_OWNER,
+      parentGoalId: "m",
+    });
+    const p = computeProgress([month, task], [ci("t", A, "2026-11-14")], "2026-11-20", members);
+    expect(get(p, "m").ladder).toBe(0);
+  });
+
+  test("a habit child still earns its fraction of the month", () => {
+    const month = goal({ id: "m", horizon: "month", period: "2026-11", targetUnits: 2 });
+    const habit = goal({ id: "h", horizon: "day", owner: A, parentGoalId: "m" });
+    const p = computeProgress([month, habit], [ci("h", A, "2026-11-01")], "2026-11-02", members);
+    expect(get(p, "m").ladder).toBe(0.5);
   });
 });

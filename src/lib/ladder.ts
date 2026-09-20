@@ -1,5 +1,6 @@
 // Pure progress maths for the Timeline and the Den.
-import type { Goal } from "./domain";
+import type { Goal, Member } from "./domain";
+import { isTask, stampersOf } from "./goals";
 import { daysElapsedInPeriod, periodContainsDay, shiftDay } from "./periods";
 
 export interface CheckInLite {
@@ -14,6 +15,13 @@ export interface GoalProgress {
   progress: number;
   target: number;
   complete: boolean;
+}
+
+export interface TaskState {
+  /** Has each stamper put their paw on it? */
+  doneBy: Record<string, boolean>;
+  /** Every stamper has. A shared one-off waits for both. */
+  done: boolean;
 }
 
 export interface HabitState {
@@ -60,10 +68,41 @@ export function habitFraction(
   return Math.min(1, days.size / elapsed);
 }
 
+/** Has every stamper put a paw on this one-off, on its own day? */
+function taskDone(goal: Goal, stamps: CheckInLite[], members: Member[]): boolean {
+  const stampers = stampersOf(goal, members);
+  return (
+    stampers.length > 0 &&
+    stampers.every((m) => stamps.some((c) => c.uid === m.id && c.day === goal.period))
+  );
+}
+
+export function computeTaskStates(
+  goals: Goal[],
+  checkins: CheckInLite[],
+  members: Member[],
+): Record<string, TaskState> {
+  const grouped = byGoal(checkins);
+  const out: Record<string, TaskState> = {};
+  for (const g of goals) {
+    if (!isTask(g) || g.archivedAt !== null) {
+      continue;
+    }
+    const stamps = grouped.get(g.id) ?? [];
+    const doneBy: Record<string, boolean> = {};
+    for (const m of stampersOf(g, members)) {
+      doneBy[m.id] = stamps.some((c) => c.uid === m.id && c.day === g.period);
+    }
+    out[g.id] = { doneBy, done: taskDone(g, stamps, members) };
+  }
+  return out;
+}
+
 export function computeProgress(
   goals: Goal[],
   checkins: CheckInLite[],
   today: string,
+  members: Member[] = [],
 ): Record<string, GoalProgress> {
   const active = goals.filter((g) => g.archivedAt === null);
   const grouped = byGoal(checkins);
@@ -94,7 +133,11 @@ export function computeProgress(
     );
     let ladder = 0;
     for (const child of children.get(goal.id) ?? []) {
-      if (child.horizon === "day") {
+      if (isTask(child)) {
+        // One thing done on one day is a whole paw when it is finished — not the
+        // day-out-of-the-month fraction a habit earns.
+        ladder += taskDone(child, grouped.get(child.id) ?? [], members) ? 1 : 0;
+      } else if (child.horizon === "day") {
         ladder += habitFraction(child, grouped.get(child.id) ?? [], period, today);
       } else {
         const p = progressOf(child);
@@ -139,7 +182,7 @@ export function computeHabitStates(
   }
   const out: Record<string, HabitState> = {};
   for (const g of goals) {
-    if (g.horizon !== "day" || g.archivedAt !== null) {
+    if (g.horizon !== "day" || isTask(g) || g.archivedAt !== null) {
       continue;
     }
     const stamps = grouped.get(g.id) ?? [];
