@@ -336,7 +336,7 @@ export default function TimelinePage() {
         onOpenChange={onDialogOpenChange}
         onSaved={onSaved}
         open={dialogOpen}
-        parents={parentCandidates(view.goals, h, today)}
+        parents={parentCandidates(view.goals, h, null, today)}
       />
     </section>
   );
