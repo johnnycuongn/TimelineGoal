@@ -279,6 +279,7 @@ export type Database = {
       }
       fresh_share_code: { Args: never; Returns: string }
       gen_share_code: { Args: never; Returns: string }
+      is_day_key: { Args: { p: string }; Returns: boolean }
       join_den: {
         Args: { p_code: string; p_color: string; p_display_name: string }
         Returns: string
