@@ -223,3 +223,59 @@ describe("tasks", () => {
     expect(get(p, "m").ladder).toBe(0.5);
   });
 });
+
+describe("climbing past the next rung", () => {
+  test("a finished week is a paw toward the year it feeds directly", () => {
+    const goals = [
+      goal({ id: "y", horizon: "year", period: "2026", targetUnits: 12 }),
+      goal({ id: "w", horizon: "week", period: "2026-W40", targetUnits: 2, parentGoalId: "y" }),
+    ];
+    const checkins = [ci("w", A, "2026-09-29"), ci("w", A, "2026-10-01")];
+    const p = computeProgress(goals, checkins, "2026-10-02");
+    expect(get(p, "w").complete).toBe(true);
+    expect(get(p, "y").ladder).toBe(1);
+  });
+
+  test("a week climbs through its month, and the month through to the year", () => {
+    const goals = [
+      goal({ id: "y", horizon: "year", period: "2026", targetUnits: 4 }),
+      goal({ id: "m", horizon: "month", period: "2026-10", targetUnits: 1, parentGoalId: "y" }),
+      goal({ id: "w", horizon: "week", period: "2026-W41", targetUnits: 1, parentGoalId: "m" }),
+    ];
+    const p = computeProgress(goals, [ci("w", A, "2026-10-06")], "2026-10-06");
+    expect(get(p, "m").complete).toBe(true);
+    expect(get(p, "y").ladder).toBe(1);
+  });
+
+  test("a habit's share of a year counts from the day it began, not 1 January", () => {
+    const goals = [
+      goal({ id: "y", horizon: "year", period: "2026", targetUnits: 3 }),
+      goal({
+        id: "h",
+        horizon: "day",
+        parentGoalId: "y",
+        createdAt: "2026-10-01T22:00:00.000Z",
+      }),
+    ];
+    // Written down on the morning of 2 October in Sydney, which is still 1 October in UTC.
+    const checkins = ["02", "03", "04"].map((d) => ci("h", A, `2026-10-${d}`));
+    const p = computeProgress(goals, checkins, "2026-10-04");
+    expect(get(p, "y").ladder).toBe(1);
+  });
+
+  test("a habit stamped before its UTC birthday still counts that day", () => {
+    const goals = [
+      goal({ id: "w", horizon: "week", period: "2026-W40", targetUnits: 1 }),
+      goal({
+        id: "h",
+        horizon: "day",
+        parentGoalId: "w",
+        createdAt: "2026-09-30T23:00:00.000Z",
+      }),
+    ];
+    const checkins = [ci("h", A, "2026-09-30"), ci("h", A, "2026-10-02")];
+    const p = computeProgress(goals, checkins, "2026-10-02");
+    // 30 Sep to 2 Oct is three days; two were kept.
+    expect(get(p, "w").ladder).toBeCloseTo(2 / 3);
+  });
+});

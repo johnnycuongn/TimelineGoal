@@ -4,6 +4,7 @@ import { HORIZONS, type Horizon } from "@/lib/domain";
 
 const LABELS: Record<Horizon, string> = {
   day: "Day",
+  week: "Week",
   month: "Month",
   quarter: "Quarter",
   year: "Year",

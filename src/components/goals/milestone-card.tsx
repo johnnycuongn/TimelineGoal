@@ -17,7 +17,8 @@ function childLabel(child: Goal, cp: GoalProgress | undefined): string {
   if (child.horizon === "day") {
     return "daily habit";
   }
-  return cp ? `${filledPaws(cp)}/${cp.target}` : "";
+  // A year can gather weeks, months and quarters at once, so say which this one is.
+  return cp ? `${child.horizon} · ${filledPaws(cp)}/${cp.target}` : "";
 }
 
 function sealLabel(mySeal: boolean): string {

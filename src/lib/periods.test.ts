@@ -3,22 +3,22 @@ import {
   CHECKIN_WINDOW_DAYS,
   canPlanPeriod,
   checkinFloor,
-  childHorizon,
   dayKeyFromDate,
   dayLabel,
   daysBetween,
   daysElapsedInPeriod,
   horizonOfPeriod,
+  horizonsAbove,
   isDayWithinTolerance,
   isValidDayKey,
   isValidPeriod,
-  parentHorizon,
   periodContainsDay,
   periodContainsPeriod,
   periodFor,
   periodLabel,
   periodRange,
   periodsBetween,
+  periodsOverlap,
   shiftDay,
   shiftPeriod,
 } from "./periods";
@@ -102,11 +102,11 @@ describe("periods", () => {
     expect(periodLabel("2026")).toBe("2026");
   });
 
-  test("horizon relations", () => {
-    expect(parentHorizon("day")).toBe("month");
-    expect(parentHorizon("year")).toBeNull();
-    expect(childHorizon("month")).toBe("day");
-    expect(childHorizon("day")).toBeNull();
+  test("a goal may climb toward any longer horizon", () => {
+    expect(horizonsAbove("day")).toEqual(["week", "month", "quarter", "year"]);
+    expect(horizonsAbove("week")).toEqual(["month", "quarter", "year"]);
+    expect(horizonsAbove("month")).toEqual(["quarter", "year"]);
+    expect(horizonsAbove("year")).toEqual([]);
   });
 });
 
@@ -220,5 +220,65 @@ describe("dayLabel", () => {
   test("gives a weekday and date further out, with the year only when it differs", () => {
     expect(dayLabel("2026-11-14", "2026-09-20")).toBe("Sat 14 Nov");
     expect(dayLabel("2027-01-04", "2026-09-20")).toBe("Mon 4 Jan 2027");
+  });
+});
+
+describe("ISO weeks", () => {
+  test("periodFor gives the week holding the day, Monday to Sunday", () => {
+    expect(periodFor("week", "2026-10-02")).toBe("2026-W40");
+    expect(periodFor("week", "2026-09-28")).toBe("2026-W40");
+    expect(periodFor("week", "2026-10-04")).toBe("2026-W40");
+    expect(periodFor("week", "2026-10-05")).toBe("2026-W41");
+  });
+
+  test("a week belongs to the year of its Thursday", () => {
+    expect(periodFor("week", "2025-12-29")).toBe("2026-W01");
+    expect(periodFor("week", "2027-01-01")).toBe("2026-W53");
+    expect(periodFor("week", "2021-01-03")).toBe("2020-W53");
+  });
+
+  test("isValidPeriod knows which years have a 53rd week", () => {
+    expect(isValidPeriod("2026-W53")).toBe(true);
+    expect(isValidPeriod("2025-W53")).toBe(false);
+    expect(isValidPeriod("2026-W00")).toBe(false);
+    expect(isValidPeriod("2026-W54")).toBe(false);
+    expect(horizonOfPeriod("2026-W40")).toBe("week");
+  });
+
+  test("periodRange runs Monday to Sunday, across a year end too", () => {
+    expect(periodRange("2026-W40")).toEqual({ start: "2026-09-28", end: "2026-10-04" });
+    expect(periodRange("2026-W01")).toEqual({ start: "2025-12-29", end: "2026-01-04" });
+    expect(() => periodRange("2025-W53")).toThrow("Invalid period");
+  });
+
+  test("shiftPeriod and periodsBetween step a week at a time", () => {
+    expect(shiftPeriod("2026-W40", 1)).toBe("2026-W41");
+    expect(shiftPeriod("2026-W01", -1)).toBe("2025-W52");
+    expect(shiftPeriod("2026-W52", 1)).toBe("2026-W53");
+    expect(shiftPeriod("2026-W53", 1)).toBe("2027-W01");
+    expect(periodsBetween("2026-W40", "2027-W02")).toBe(15);
+  });
+
+  test("periodLabel names the days a week spans", () => {
+    expect(periodLabel("2026-W41")).toBe("5 – 11 Oct 2026");
+    expect(periodLabel("2026-W40")).toBe("28 Sep – 4 Oct 2026");
+    expect(periodLabel("2026-W01")).toBe("29 Dec – 4 Jan 2026");
+  });
+
+  test("a week can overlap two months without sitting inside either", () => {
+    expect(periodsOverlap("2026-09", "2026-W40")).toBe(true);
+    expect(periodsOverlap("2026-10", "2026-W40")).toBe(true);
+    expect(periodsOverlap("2026-11", "2026-W40")).toBe(false);
+    expect(periodContainsPeriod("2026-10", "2026-W40")).toBe(false);
+    expect(periodContainsPeriod("2026-10", "2026-W41")).toBe(true);
+  });
+
+  test("canPlanPeriod looks half a year ahead in weeks", () => {
+    expect(canPlanPeriod("2027-W13", "2026-10-02")).toBe(true);
+    expect(canPlanPeriod("2027-W14", "2026-10-02")).toBe(false);
+  });
+
+  test("checkinFloor reaches back to a week that starts the December before", () => {
+    expect(checkinFloor("2020-W01", "2026-10-02")).toBe("2019-12-30");
   });
 });

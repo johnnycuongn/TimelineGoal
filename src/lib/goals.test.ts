@@ -64,34 +64,57 @@ describe("stampersOf", () => {
 });
 
 describe("parentCandidates", () => {
+  const w40 = goal({ id: "w40", horizon: "week", period: "2026-W40" });
+  const w46 = goal({ id: "w46", horizon: "week", period: "2026-W46" });
+  const sep = goal({ id: "sep", horizon: "month", period: "2026-09" });
+  const oct = goal({ id: "oct", horizon: "month", period: "2026-10" });
   const nov = goal({ id: "nov", horizon: "month", period: "2026-11" });
   const dec = goal({ id: "dec", horizon: "month", period: "2026-12" });
+  const q3 = goal({ id: "q3", horizon: "quarter", period: "2026-Q3" });
   const q4 = goal({ id: "q4", horizon: "quarter", period: "2026-Q4" });
   const y26 = goal({ id: "y26", horizon: "year", period: "2026" });
-  const goals = [nov, dec, q4, y26];
+  const goals = [y26, q4, q3, dec, nov, oct, sep, w46, w40];
 
-  test("a month goal climbs toward the quarter that holds its period", () => {
-    expect(parentCandidates(goals, "month", "2026-11", "2026-09-20")).toEqual([q4]);
+  test("a month goal climbs toward its quarter or its year", () => {
+    expect(parentCandidates(goals, "month", "2026-11", "2026-09-20")).toEqual([q4, y26]);
   });
 
   test("a quarter goal climbs toward its year", () => {
     expect(parentCandidates(goals, "quarter", "2026-Q4", "2026-09-20")).toEqual([y26]);
   });
 
+  test("a week inside one month climbs toward that month, its quarter or its year", () => {
+    expect(parentCandidates(goals, "week", "2026-W46", "2026-09-20")).toEqual([nov, q4, y26]);
+  });
+
+  test("a week across a month end may climb toward either month, and either quarter", () => {
+    expect(parentCandidates(goals, "week", "2026-W40", "2026-09-20")).toEqual([
+      sep,
+      oct,
+      q3,
+      q4,
+      y26,
+    ]);
+  });
+
   test("a goal planned for next year is not offered this year's parents", () => {
     expect(parentCandidates(goals, "quarter", "2027-Q1", "2026-09-20")).toEqual([]);
   });
 
-  test("a task climbs toward the month that holds its day", () => {
-    expect(parentCandidates(goals, "day", "2026-11-14", "2026-09-20")).toEqual([nov]);
+  test("a task climbs toward its week, month, quarter or year", () => {
+    expect(parentCandidates(goals, "day", "2026-11-14", "2026-09-20")).toEqual([w46, nov, q4, y26]);
   });
 
-  test("a habit has no period, so it climbs toward the month holding today", () => {
-    expect(parentCandidates(goals, "day", null, "2026-11-03")).toEqual([nov]);
+  test("a habit has no period, so it climbs toward whatever holds today", () => {
+    expect(parentCandidates(goals, "day", null, "2026-11-12")).toEqual([w46, nov, q4, y26]);
   });
 
   test("a year goal has nothing above it", () => {
     expect(parentCandidates(goals, "year", "2026", "2026-09-20")).toEqual([]);
+  });
+
+  test("a goal never climbs toward something as short as itself", () => {
+    expect(parentCandidates(goals, "month", "2026-10", "2026-09-20")).not.toContain(oct);
   });
 
   test("an archived parent is not offered", () => {

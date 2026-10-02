@@ -1,7 +1,7 @@
 // Pure progress maths for the Timeline and the Den.
 import type { Goal, Member } from "./domain";
 import { isTask, stampersOf } from "./goals";
-import { daysElapsedInPeriod, periodContainsDay, shiftDay } from "./periods";
+import { daysBetween, periodContainsDay, periodRange, shiftDay } from "./periods";
 
 export interface CheckInLite {
   goalId: string;
@@ -33,6 +33,7 @@ export interface HabitState {
 }
 
 const EPSILON = 1e-9;
+const DAY_KEY_LENGTH = 10;
 const STRIP_DAYS = 7;
 
 function byGoal(checkins: CheckInLite[]): Map<string, CheckInLite[]> {
@@ -48,24 +49,48 @@ function byGoal(checkins: CheckInLite[]): Map<string, CheckInLite[]> {
   return map;
 }
 
-/** Distinct days (by any member) a habit was stamped inside `period`, up to today. */
+/**
+ * The first day a habit's record is held against. `createdAt` is UTC, which is a day
+ * behind the calendar for anyone east of Greenwich in their morning, so the habit is
+ * taken to start the UTC day after — unless it was stamped earlier than that, in which
+ * case that stamp is the start.
+ */
+function habitStart(goal: Goal, stampedDays: Iterable<string>): string {
+  let start = shiftDay(goal.createdAt.slice(0, DAY_KEY_LENGTH), 1);
+  for (const day of stampedDays) {
+    if (day < start) {
+      start = day;
+    }
+  }
+  return start;
+}
+
+/**
+ * Distinct days (by any member) a habit was stamped inside `period`, up to today, over
+ * the days it could have been. The clock starts at the later of the period's start and
+ * the habit's own, so a habit begun in October and kept every day since is a whole paw
+ * toward the year — not a quarter of one.
+ */
 export function habitFraction(
   goal: Goal,
   checkins: CheckInLite[],
   period: string,
   today: string,
 ): number {
-  const elapsed = daysElapsedInPeriod(period, today);
-  if (elapsed === 0) {
-    return 0;
-  }
   const days = new Set<string>();
   for (const c of checkins) {
     if (c.goalId === goal.id && c.day <= today && periodContainsDay(period, c.day)) {
       days.add(c.day);
     }
   }
-  return Math.min(1, days.size / elapsed);
+  const { start, end } = periodRange(period);
+  const born = habitStart(goal, days);
+  const from = born > start ? born : start;
+  const last = today < end ? today : end;
+  if (last < from) {
+    return 0;
+  }
+  return Math.min(1, days.size / (daysBetween(from, last) + 1));
 }
 
 /** Has every stamper put a paw on this one-off, on its own day? */

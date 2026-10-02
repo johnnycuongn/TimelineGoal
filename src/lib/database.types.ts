@@ -280,24 +280,22 @@ export type Database = {
       fresh_share_code: { Args: never; Returns: string }
       gen_share_code: { Args: never; Returns: string }
       is_day_key: { Args: { p: string }; Returns: boolean }
+      is_week_key: { Args: { p: string }; Returns: boolean }
       join_den: {
         Args: { p_code: string; p_color: string; p_display_name: string }
         Returns: string
       }
       mint_invite_code: { Args: never; Returns: string }
       my_couple_id: { Args: never; Returns: string }
-      parent_horizon: {
-        Args: { h: Database["public"]["Enums"]["horizon"] }
-        Returns: Database["public"]["Enums"]["horizon"]
-      }
       period_horizon: {
         Args: { p: string }
         Returns: Database["public"]["Enums"]["horizon"]
       }
       period_range: { Args: { p: string }; Returns: unknown }
+      week_start: { Args: { p: string }; Returns: string }
     }
     Enums: {
-      horizon: "day" | "month" | "quarter" | "year"
+      horizon: "day" | "week" | "month" | "quarter" | "year"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -425,7 +423,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      horizon: ["day", "month", "quarter", "year"],
+      horizon: ["day", "week", "month", "quarter", "year"],
     },
   },
 } as const

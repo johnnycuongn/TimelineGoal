@@ -1,7 +1,7 @@
 // Browser-side domain model. Rows from Supabase are mapped into these shapes
 // once (src/data/mappers.ts); everything else in the app speaks this language.
 
-export const HORIZONS = ["day", "month", "quarter", "year"] as const;
+export const HORIZONS = ["day", "week", "month", "quarter", "year"] as const;
 export type Horizon = (typeof HORIZONS)[number];
 export type MilestoneHorizon = Exclude<Horizon, "day">;
 

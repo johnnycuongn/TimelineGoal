@@ -1,6 +1,6 @@
 import type { Goal, Horizon, Member } from "./domain";
-import { SHARED_OWNER } from "./domain";
-import { parentHorizon, periodContainsPeriod } from "./periods";
+import { HORIZONS, SHARED_OWNER } from "./domain";
+import { horizonsAbove, periodContainsPeriod, periodsOverlap } from "./periods";
 
 /** A daily habit: every day, for as long as it is wanted. */
 export function isHabit(goal: Goal): boolean {
@@ -23,9 +23,22 @@ export function stampersOf(goal: Goal, members: Member[]): Member[] {
 }
 
 /**
- * Active goals one horizon up that cover `period` — the stretch of time the goal being
- * written belongs to. A habit has no period of its own, so it climbs toward whatever
- * holds today, which is the rule `goals_validate` enforces in the database.
+ * Does a goal of `horizon` over `period` fit inside `parentPeriod`? Everything must sit
+ * inside its parent's stretch of time, except a week: weeks ignore month lines, so the
+ * one from 28 Sep to 4 Oct may feed September or October. `goals_validate` holds the
+ * same rule in the database.
+ */
+export function fitsParentPeriod(horizon: Horizon, period: string, parentPeriod: string): boolean {
+  return horizon === "week"
+    ? periodsOverlap(parentPeriod, period)
+    : periodContainsPeriod(parentPeriod, period);
+}
+
+/**
+ * Active goals on any longer horizon that cover `period` — the stretch of time the goal
+ * being written belongs to — shortest horizon first, then earliest. A habit has no period of its own,
+ * so it climbs toward whatever holds today, which is the rule `goals_validate` enforces
+ * in the database.
  */
 export function parentCandidates(
   goals: Goal[],
@@ -33,16 +46,19 @@ export function parentCandidates(
   period: string | null,
   today: string,
 ): Goal[] {
-  const up = parentHorizon(horizon);
-  if (!up || up === "day") {
-    return [];
-  }
+  const above = horizonsAbove(horizon);
   const anchor = period ?? today;
-  return goals.filter(
-    (g) =>
-      g.horizon === up &&
-      g.archivedAt === null &&
-      g.period !== null &&
-      periodContainsPeriod(g.period, anchor),
-  );
+  return goals
+    .filter(
+      (g) =>
+        above.includes(g.horizon) &&
+        g.archivedAt === null &&
+        g.period !== null &&
+        fitsParentPeriod(horizon, anchor, g.period),
+    )
+    .sort(
+      (a, b) =>
+        HORIZONS.indexOf(a.horizon) - HORIZONS.indexOf(b.horizon) ||
+        (a.period ?? "").localeCompare(b.period ?? ""),
+    );
 }

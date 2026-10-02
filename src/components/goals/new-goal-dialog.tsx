@@ -26,6 +26,7 @@ import { dayLabel, periodLabel } from "@/lib/periods";
 
 const HORIZON_HINT: Record<Horizon, string> = {
   day: "A habit that shows up every day. One paw per person per day.",
+  week: "A milestone for a week, Monday to Sunday.",
   month: "A milestone for a month, filled with paw prints.",
   quarter: "A bigger milestone for a quarter.",
   year: "The dream for a year.",
@@ -47,6 +48,19 @@ function submitLabel(editing: boolean, sealsOnCreate: boolean): string {
     return "Save";
   }
   return sealsOnCreate ? "Create and seal" : "Create";
+}
+
+/**
+ * Parents bunched under the stretch of time they are for — this week, October, Q4, 2026 —
+ * in the order `parentCandidates` gives them.
+ */
+function groupByPeriod(goals: Goal[]): [string, Goal[]][] {
+  const groups = new Map<string, Goal[]>();
+  for (const g of goals) {
+    const key = g.period ?? "";
+    groups.set(key, [...(groups.get(key) ?? []), g]);
+  }
+  return [...groups];
 }
 
 export interface GoalDialogContext {
@@ -91,7 +105,7 @@ export default function NewGoalDialog({
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  // Parents live one horizon up, so a pick made on another tab can never be right.
+  // Which parents fit depends on the horizon, so a pick made on another tab may not.
   // biome-ignore lint/correctness/useExhaustiveDependencies: horizon is the reset trigger, not a value the effect reads
   useEffect(() => {
     setParentGoalId("");
@@ -139,6 +153,7 @@ export default function NewGoalDialog({
     () => parentCandidates(goals, horizon, goalPeriod, ctx.today),
     [goals, horizon, goalPeriod, ctx.today],
   );
+  const parentGroups = useMemo(() => groupByPeriod(parents), [parents]);
   const close = useCallback(() => onOpenChange(false), [onOpenChange]);
 
   const submit = useCallback(
@@ -294,11 +309,15 @@ export default function NewGoalDialog({
               <Label htmlFor="goal-parent">Climbs toward</Label>
               <NativeSelect id="goal-parent" onChange={onParent} value={parentGoalId}>
                 <option value="">Nothing bigger (yet)</option>
-                {parents.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.charm ? `${p.charm} ` : ""}
-                    {p.title}
-                  </option>
+                {parentGroups.map(([groupPeriod, list]) => (
+                  <optgroup key={groupPeriod} label={periodLabel(groupPeriod)}>
+                    {list.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.charm ? `${p.charm} ` : ""}
+                        {p.title}
+                      </option>
+                    ))}
+                  </optgroup>
                 ))}
               </NativeSelect>
             </div>

@@ -1,13 +1,20 @@
-// Day keys are "YYYY-MM-DD"; periods are "YYYY-MM", "YYYY-Qn" or "YYYY".
+// Day keys are "YYYY-MM-DD"; periods are "YYYY-Www" (an ISO week, Monday to Sunday),
+// "YYYY-MM", "YYYY-Qn" or "YYYY".
 // All arithmetic runs on UTC dates built from the key parts, so results never
 // depend on the machine's timezone. The browser decides what "today" is.
 import { HORIZONS, type Horizon, type MilestoneHorizon } from "./domain";
 
 const DAY_RE = /^(\d{4})-(\d{2})-(\d{2})$/;
+const WEEK_RE = /^(\d{4})-W(\d{2})$/;
 const MONTH_RE = /^(\d{4})-(\d{2})$/;
 const QUARTER_RE = /^(\d{4})-Q([1-4])$/;
 const YEAR_RE = /^(\d{4})$/;
 const MS_PER_DAY = 86_400_000;
+const DAYS_PER_WEEK = 7;
+/** 4 January is always in an ISO year's first week. */
+const FIRST_WEEK_ANCHOR = 4;
+/** Thursday, counted from Monday = 0: the day that decides which ISO year a week is in. */
+const THURSDAY = 3;
 const MONTHS_PER_QUARTER = 3;
 const MONTHS_PER_YEAR = 12;
 const YEAR_KEY_LENGTH = 4;
@@ -88,7 +95,32 @@ export function dayLabel(day: string, today: string): string {
     : `${stem} ${date.getUTCFullYear()}`;
 }
 
+/** Monday = 0 … Sunday = 6. */
+function isoWeekday(date: Date): number {
+  return (date.getUTCDay() + 6) % DAYS_PER_WEEK;
+}
+
+/** The ISO week a day falls in: the one holding its Thursday, which fixes the year. */
+function isoWeekOf(day: string): { year: number; week: number } {
+  const thursday = toUtc(day);
+  thursday.setUTCDate(thursday.getUTCDate() + THURSDAY - isoWeekday(thursday));
+  const year = thursday.getUTCFullYear();
+  const jan1 = Date.UTC(year, 0, 1);
+  return { year, week: Math.floor((thursday.getTime() - jan1) / MS_PER_DAY / DAYS_PER_WEEK) + 1 };
+}
+
+/** The Monday a week key starts on. Does not check the week exists; isValidPeriod does. */
+function weekStart(year: number, week: number): string {
+  const anchor = new Date(Date.UTC(year, 0, FIRST_WEEK_ANCHOR));
+  anchor.setUTCDate(anchor.getUTCDate() - isoWeekday(anchor) + (week - 1) * DAYS_PER_WEEK);
+  return dayKeyFromDate(anchor);
+}
+
 export function periodFor(horizon: MilestoneHorizon, day: string): string {
+  if (horizon === "week") {
+    const { year, week } = isoWeekOf(day);
+    return `${year}-W${pad(week)}`;
+  }
   const date = toUtc(day);
   const year = date.getUTCFullYear();
   const month = date.getUTCMonth() + 1;
@@ -102,6 +134,12 @@ export function periodFor(horizon: MilestoneHorizon, day: string): string {
 }
 
 export function isValidPeriod(value: string): boolean {
+  const week = WEEK_RE.exec(value);
+  if (week) {
+    // A 53rd week only exists in some years: round-trip through its Monday to find out.
+    const w = Number(week[2]);
+    return w >= 1 && periodFor("week", weekStart(Number(week[1]), w)) === value;
+  }
   const month = MONTH_RE.exec(value);
   if (month) {
     const m = Number(month[2]);
@@ -111,6 +149,9 @@ export function isValidPeriod(value: string): boolean {
 }
 
 export function horizonOfPeriod(period: string): MilestoneHorizon {
+  if (WEEK_RE.test(period)) {
+    return "week";
+  }
   if (MONTH_RE.test(period)) {
     return "month";
   }
@@ -148,6 +189,14 @@ export function periodRange(period: string): { start: string; end: string } {
   if (isValidDayKey(period)) {
     return { start: period, end: period };
   }
+  const week = WEEK_RE.exec(period);
+  if (week) {
+    if (!isValidPeriod(period)) {
+      throw new Error(`Invalid period: ${period}`);
+    }
+    const start = weekStart(Number(week[1]), Number(week[2]));
+    return { start, end: shiftDay(start, DAYS_PER_WEEK - 1) };
+  }
   const { year, first, last } = monthSpan(period);
   const start = new Date(Date.UTC(year, first - 1, 1));
   // Day 0 of the following month is the last day of `last`.
@@ -172,6 +221,9 @@ export function daysElapsedInPeriod(period: string, today: string): number {
 
 export function shiftPeriod(period: string, delta: number): string {
   const horizon = horizonOfPeriod(period);
+  if (horizon === "week") {
+    return periodFor("week", shiftDay(periodRange(period).start, delta * DAYS_PER_WEEK));
+  }
   const { year, first } = monthSpan(period);
   if (horizon === "year") {
     return String(year + delta);
@@ -187,6 +239,9 @@ export function periodLabel(period: string): string {
     return `${date.getUTCDate()} ${MONTH_NAMES[date.getUTCMonth()]} ${date.getUTCFullYear()}`;
   }
   const horizon = horizonOfPeriod(period);
+  if (horizon === "week") {
+    return weekLabel(period);
+  }
   const { year, first } = monthSpan(period);
   if (horizon === "month") {
     return `${MONTH_NAMES[first - 1]} ${year}`;
@@ -197,6 +252,22 @@ export function periodLabel(period: string): string {
   return String(year);
 }
 
+/**
+ * "5 – 11 Oct 2026", "28 Sep – 4 Oct 2026", "29 Dec – 4 Jan 2026". The year is said once,
+ * even across New Year: the label has to fit beside the picker's arrows on a 320 px phone.
+ */
+function weekLabel(period: string): string {
+  const { start, end } = periodRange(period);
+  const a = toUtc(start);
+  const b = toUtc(end);
+  const month = (d: Date) => MONTH_NAMES[d.getUTCMonth()]?.slice(0, SHORT_MONTH_LENGTH) ?? "";
+  const tail = `${b.getUTCDate()} ${month(b)} ${b.getUTCFullYear()}`;
+  if (a.getUTCMonth() !== b.getUTCMonth()) {
+    return `${a.getUTCDate()} ${month(a)} – ${tail}`;
+  }
+  return `${a.getUTCDate()} – ${tail}`;
+}
+
 /** Does `outer` cover every day of `inner`? Either may be a day key or a milestone period. */
 export function periodContainsPeriod(outer: string, inner: string): boolean {
   const o = periodRange(outer);
@@ -204,11 +275,21 @@ export function periodContainsPeriod(outer: string, inner: string): boolean {
   return o.start <= i.start && i.end <= o.end;
 }
 
+/** Do `a` and `b` share at least one day? */
+export function periodsOverlap(a: string, b: string): boolean {
+  const x = periodRange(a);
+  const y = periodRange(b);
+  return x.start <= y.end && y.start <= x.end;
+}
+
 /** Signed number of periods from `from` to `to`. Both must share a horizon. */
 export function periodsBetween(from: string, to: string): number {
   const horizon = horizonOfPeriod(from);
   if (horizonOfPeriod(to) !== horizon) {
     throw new Error(`Periods of different horizons: ${from}, ${to}`);
+  }
+  if (horizon === "week") {
+    return daysBetween(periodRange(from).start, periodRange(to).start) / DAYS_PER_WEEK;
   }
   const a = monthSpan(from);
   const b = monthSpan(to);
@@ -223,7 +304,7 @@ export function periodsBetween(from: string, to: string): number {
  * How far ahead a couple may plan: far enough for a real dream, close enough that nobody
  * walks the picker to the year 3000 and wonders where their goals went.
  */
-const LOOK_AHEAD: Record<MilestoneHorizon, number> = { month: 24, quarter: 8, year: 5 };
+const LOOK_AHEAD: Record<MilestoneHorizon, number> = { week: 26, month: 24, quarter: 8, year: 5 };
 
 /** Is `period` somewhere a goal may be written: any memory, or a bounded stretch ahead? */
 export function canPlanPeriod(period: string, today: string): boolean {
@@ -231,14 +312,9 @@ export function canPlanPeriod(period: string, today: string): boolean {
   return periodsBetween(periodFor(horizon, today), period) <= LOOK_AHEAD[horizon];
 }
 
-export function parentHorizon(horizon: Horizon): Horizon | null {
-  const index = HORIZONS.indexOf(horizon);
-  return HORIZONS[index + 1] ?? null;
-}
-
-export function childHorizon(horizon: Horizon): Horizon | null {
-  const index = HORIZONS.indexOf(horizon);
-  return index > 0 ? (HORIZONS[index - 1] ?? null) : null;
+/** Every horizon a goal of `horizon` may climb toward: anything longer than itself. */
+export function horizonsAbove(horizon: Horizon): Horizon[] {
+  return HORIZONS.slice(HORIZONS.indexOf(horizon) + 1);
 }
 
 /**
@@ -259,6 +335,9 @@ export function checkinFloor(viewedPeriod: string | undefined, today: string): s
   if (viewedPeriod === undefined || !isValidPeriod(viewedPeriod)) {
     return rolling;
   }
-  const { start } = periodRange(viewedPeriod.slice(0, YEAR_KEY_LENGTH));
+  // An ISO week can start in the December before its year, so take whichever is earlier.
+  const yearStart = periodRange(viewedPeriod.slice(0, YEAR_KEY_LENGTH)).start;
+  const periodStart = periodRange(viewedPeriod).start;
+  const start = periodStart < yearStart ? periodStart : yearStart;
   return start < rolling ? start : rolling;
 }
