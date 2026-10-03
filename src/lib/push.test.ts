@@ -1,5 +1,11 @@
 import { afterEach, describe, expect, test, vi } from "vitest";
-import { currentSubscription, type PushEnv, pushSupport, urlBase64ToUint8Array } from "./push";
+import {
+  currentSubscription,
+  type PushEnv,
+  pushSupport,
+  shouldRegisterDevice,
+  urlBase64ToUint8Array,
+} from "./push";
 
 const capable: PushEnv = {
   hasServiceWorker: true,
@@ -68,5 +74,23 @@ describe("urlBase64ToUint8Array", () => {
     const bytes = urlBase64ToUint8Array(key);
     expect(bytes.length).toBe(65);
     expect(bytes[0]).toBe(4);
+  });
+});
+
+describe("shouldRegisterDevice", () => {
+  test("allowed, with a key: register this phone for whoever is signed in", () => {
+    expect(shouldRegisterDevice({ vapidKey: "BEl6", permission: "granted" })).toBe(true);
+  });
+
+  test.each(["default", "denied", null] as const)(
+    "permission %s: never register (and never ask)",
+    (permission) => {
+      expect(shouldRegisterDevice({ vapidKey: "BEl6", permission })).toBe(false);
+    },
+  );
+
+  test("no key on this site: nothing to register with", () => {
+    expect(shouldRegisterDevice({ vapidKey: undefined, permission: "granted" })).toBe(false);
+    expect(shouldRegisterDevice({ vapidKey: "", permission: "granted" })).toBe(false);
   });
 });

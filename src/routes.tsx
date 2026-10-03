@@ -4,7 +4,7 @@ import AppShell from "@/components/app-shell";
 import RouteErrorPanel, { ErrorPanel } from "@/components/error-panel";
 import { DenContext, type DenValue } from "@/data/den-context";
 import { useMe } from "@/data/use-me";
-import { useTimezoneSync } from "@/data/use-notification-prefs";
+import { useDeviceRegistration, useTimezoneSync } from "@/data/use-notification-prefs";
 import DenPage from "@/pages/den";
 import LandingPage from "@/pages/landing";
 import LoginPage from "@/pages/login";
@@ -36,6 +36,7 @@ function RequireSession() {
 /** Signed-in users with a den. Provides `me` (with a non-null couple) to pages. */
 function RequireDen() {
   useTimezoneSync();
+  useDeviceRegistration();
   const { me, error, isLoading, refresh } = useMe();
   // Data first, as in SignedOutOnly: `me` stays in the SWR cache, so a failed background
   // revalidation must not blank a working den — only a cold who-am-I failure shows the panel.

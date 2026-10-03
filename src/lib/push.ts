@@ -36,6 +36,17 @@ export function readPushEnv(standalone: boolean): PushEnv {
   };
 }
 
+/**
+ * Whether to (re)register this phone for the signed-in account on load. Only when the site
+ * has a key and the person already allowed notifications — this never prompts.
+ */
+export function shouldRegisterDevice(env: {
+  vapidKey: string | undefined;
+  permission: NotificationPermission | null;
+}): boolean {
+  return Boolean(env.vapidKey) && env.permission === "granted";
+}
+
 export function urlBase64ToUint8Array(base64: string): Uint8Array<ArrayBuffer> {
   const padded = `${base64}${"=".repeat((4 - (base64.length % 4)) % 4)}`
     .replaceAll("-", "+")

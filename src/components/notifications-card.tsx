@@ -14,7 +14,6 @@ import type { NotificationKind, NotificationPrefs } from "@/lib/domain";
 import { friendlyError } from "@/lib/errors";
 import {
   browserTimezone,
-  currentSubscription,
   type PushSupport,
   pushSupport,
   readPushEnv,
@@ -160,27 +159,6 @@ export default function NotificationsCard() {
   useEffect(() => {
     setSupport(pushSupport(readPushEnv(standalone)));
   }, [standalone]);
-
-  // Allowed on this phone but no row for this account (e.g. the other account signed out
-  // here): quietly sign the phone back up.
-  useEffect(() => {
-    if (support !== "granted" || !VAPID_KEY || prefs === undefined) {
-      return;
-    }
-    let cancelled = false;
-    (async () => {
-      const existing = await currentSubscription();
-      if (cancelled || (existing && prefs)) {
-        return;
-      }
-      const sub = existing ?? (await subscribe(VAPID_KEY));
-      await savePushSubscription(subscriptionKeys(sub), navigator.userAgent, browserTimezone());
-      await refresh();
-    })().catch(() => undefined);
-    return () => {
-      cancelled = true;
-    };
-  }, [support, prefs, refresh]);
 
   const onTurnOn = useCallback(async () => {
     setBusy(true);
