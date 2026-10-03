@@ -171,6 +171,7 @@ new migration that undoes the change.
 - `VITE_VAPID_PUBLIC_KEY` must be set in `.env.local` and in Vercel (Preview and Production). It is public.
 - Edge Function secrets (owner sets them; never in the repo): `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`, `DISPATCH_SECRET` — `npx supabase secrets set --project-ref uosxptayqdetgbyercqt …`.
 - Vault entries: `dispatch_secret` (same value as `DISPATCH_SECRET`) and `send_push_url`.
+- The clocks are `supabase/migrations/0014_notification_cron.sql`. Apply it only after the Vault entries exist; until then the outbox fills but nothing sends. `0011`–`0013` are already applied.
 - Redeploy the function after changing it: `npx supabase functions deploy send-push --no-verify-jwt --project-ref uosxptayqdetgbyercqt`.
 - Rotating `DISPATCH_SECRET`: set the new secret on the function and update the Vault entry in the same sitting; until both match, `net._http_response` shows 401s and nothing sends.
 - The send-push function only sends to known push-service hosts (Apple, Google FCM, Mozilla, Windows); a subscription pointing anywhere else is deleted unsent.

@@ -61,7 +61,7 @@ the elevated Supabase key to a second platform).
 
 Three migrations: `0011_notifications.sql` (types, tables, RLS,
 `save_push_subscription`), `0012_notification_triggers.sql` (the other functions and
-the triggers), `0013_notification_cron.sql` (dispatch and cron, applied after the
+the triggers), `0014_notification_cron.sql` (dispatch and cron, applied after the
 Vault entries exist).
 
 ### Types and tables
@@ -173,7 +173,7 @@ The milestone count matches `checkins_validate`: both partners' paws count. The
 check-in that reaches the target triggers the celebration, so undoing it in time
 cancels the celebration too.
 
-### Cron — `supabase/migrations/0013_notification_cron.sql`
+### Cron — `supabase/migrations/0014_notification_cron.sql`
 
 A separate migration, applied after the Vault entries exist (see Order of work).
 
@@ -319,7 +319,7 @@ New primitive `src/components/ui/switch.tsx`: a hand-written wrapper over
 2. Owner generates VAPID keys and sets secrets and Vault entries.
 3. `notification-copy` + `send-push`; deploy the function; settle the Web Push
    library.
-4. `0013_notification_cron.sql` (needs the Vault entries).
+4. `0014_notification_cron.sql` (needs the Vault entries; `0013` is the review fixes).
 5. Service worker switch, data layer, Us-page card, switch primitive.
 6. Preview deploy and end-to-end test. Production and `v*` tags remain the
    owner's call.
