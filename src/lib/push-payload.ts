@@ -12,9 +12,20 @@ const TITLE = "CoupleGoal";
 const FALLBACK_BODY = "Something happened in your den.";
 const HOME = "/den";
 
-/** Only ever a path inside the app: one leading slash, never `//host`. */
-export function safePath(url: unknown): string {
-  return typeof url === "string" && /^\/(?![/\\])/.test(url) ? url : HOME;
+/**
+ * Only ever a path inside the app. Parsed rather than pattern-matched: the URL parser
+ * drops tab/CR/LF and reads `\\` as `/`, so `/\t/evil.com` is really `//evil.com`.
+ */
+export function safePath(url: unknown, origin = "https://app.invalid"): string {
+  if (typeof url !== "string" || !url.startsWith("/")) {
+    return HOME;
+  }
+  try {
+    const u = new URL(url, origin);
+    return u.origin === origin ? u.pathname + u.search + u.hash : HOME;
+  } catch {
+    return HOME;
+  }
 }
 
 function text(value: unknown): string | undefined {

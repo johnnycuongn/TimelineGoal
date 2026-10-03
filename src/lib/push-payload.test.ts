@@ -6,10 +6,23 @@ describe("safePath", () => {
     expect(safePath("/goals")).toBe("/goals");
   });
 
+  test("keeps the query and hash of an in-app path", () => {
+    expect(safePath("/goals?x=1#y")).toBe("/goals?x=1#y");
+  });
+
+  test("checks against the origin it is given", () => {
+    expect(safePath("/den", "https://couplegoal.example")).toBe("/den");
+    expect(safePath("//couplegoal.example.evil/x", "https://couplegoal.example")).toBe("/den");
+  });
+
   test.each([
     "https://evil.example/phish",
     "//evil.example/phish",
     "/\\evil.example/phish",
+    // The URL parser strips tab, CR and LF, so these become `//evil.com`.
+    "/\t/evil.com",
+    "/\n/evil.com",
+    "/\r\\evil.com",
     "javascript:alert(1)",
     "goals",
     "",

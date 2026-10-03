@@ -55,15 +55,21 @@ self.addEventListener("push", (event) => {
 
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
-  const target = new URL(safePath(event.notification.data?.url), self.location.origin).href;
+  const origin = self.location.origin;
+  const target = new URL(safePath(event.notification.data?.url, origin), origin).href;
   event.waitUntil(
     (async () => {
       const windows = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
       const open = windows[0];
       if (open) {
         await open.focus();
-        await open.navigate(target);
-        return;
+        try {
+          await open.navigate(target);
+          return;
+        } catch {
+          // navigate() refuses a window this worker doesn't control (or one that went
+          // away); open a fresh one instead.
+        }
       }
       await self.clients.openWindow(target);
     })(),
