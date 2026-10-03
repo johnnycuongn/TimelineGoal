@@ -210,6 +210,21 @@ do $$ begin
   perform public.enqueue_reminders('2030-01-19 23:05 Australia/Sydney');
   assert pg_temp.reminders() = 2, 'a muted reminder never queues';
 end $$;
+-- A reminder in the last quarter hour of the day: no tick falls between 23:50 and
+-- midnight, so it fires on the 00:00 tick, counted against the day it was for.
+update public.notification_prefs set muted = '{}', remind_at = '23:50'
+ where user_id = 'a0000000-0000-4000-8000-00000000000a';
+do $$ begin
+  perform public.enqueue_reminders('2030-01-20 23:45 Australia/Sydney');
+  assert pg_temp.reminders() = 2, 'not before a 23:50 remind_at';
+  perform public.enqueue_reminders('2030-01-21 00:00 Australia/Sydney');
+  assert pg_temp.reminders() = 3, 'a 23:50 reminder fires on the midnight tick';
+  assert (select last_reminded_on from public.notification_prefs
+          where user_id = 'a0000000-0000-4000-8000-00000000000a') = '2030-01-20',
+    'the midnight reminder counts for the day before';
+  perform public.enqueue_reminders('2030-01-21 00:15 Australia/Sydney');
+  assert pg_temp.reminders() = 3, 'and fires once';
+end $$;
 
 -- Clients may not run the server's functions.
 set local role authenticated;
