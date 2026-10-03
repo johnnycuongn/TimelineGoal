@@ -4,13 +4,14 @@ import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
 import { VitePWA } from "vite-plugin-pwa";
 
-const ONE_YEAR_SECONDS = 31_536_000;
-
 export default defineConfig({
   plugins: [
     react(),
     tailwindcss(),
     VitePWA({
+      strategies: "injectManifest",
+      srcDir: "src",
+      filename: "sw.ts",
       registerType: "autoUpdate",
       pwaAssets: { config: true },
       manifest: {
@@ -27,28 +28,8 @@ export default defineConfig({
         theme_color: "#fdf2f8",
         categories: ["lifestyle"],
       },
-      workbox: {
+      injectManifest: {
         globPatterns: ["**/*.{js,css,html,svg,png,ico,woff2}"],
-        navigateFallback: "/index.html",
-        navigateFallbackDenylist: [/^\/api\//],
-        runtimeCaching: [
-          {
-            urlPattern: /\/models\/.*\.glb$/,
-            handler: "CacheFirst",
-            options: {
-              cacheName: "pup-model",
-              expiration: { maxEntries: 2, maxAgeSeconds: ONE_YEAR_SECONDS },
-            },
-          },
-          {
-            urlPattern: /^https:\/\/fonts\.(googleapis|gstatic)\.com\/.*/i,
-            handler: "StaleWhileRevalidate",
-            options: {
-              cacheName: "fonts",
-              expiration: { maxEntries: 20, maxAgeSeconds: ONE_YEAR_SECONDS },
-            },
-          },
-        ],
       },
       devOptions: { enabled: false },
     }),
