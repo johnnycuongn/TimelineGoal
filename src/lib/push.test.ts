@@ -1,5 +1,5 @@
-import { describe, expect, test } from "vitest";
-import { type PushEnv, pushSupport, urlBase64ToUint8Array } from "./push";
+import { afterEach, describe, expect, test, vi } from "vitest";
+import { currentSubscription, type PushEnv, pushSupport, urlBase64ToUint8Array } from "./push";
 
 const capable: PushEnv = {
   hasServiceWorker: true,
@@ -36,6 +36,24 @@ describe("pushSupport", () => {
     expect(pushSupport({ ...capable, hasNotification: false, permission: null })).toBe(
       "unsupported",
     );
+  });
+});
+
+describe("currentSubscription", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  test("no service worker API at all: resolves to null", async () => {
+    vi.stubGlobal("navigator", {});
+    await expect(currentSubscription()).resolves.toBeNull();
+  });
+
+  test("no registration yet: resolves to null instead of hanging on `.ready`", async () => {
+    const getRegistration = vi.fn().mockResolvedValue(undefined);
+    vi.stubGlobal("navigator", { serviceWorker: { getRegistration } });
+    await expect(currentSubscription()).resolves.toBeNull();
+    expect(getRegistration).toHaveBeenCalled();
   });
 });
 

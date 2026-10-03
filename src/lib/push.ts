@@ -52,12 +52,20 @@ export async function currentSubscription(): Promise<PushSubscription | null> {
   if (!("serviceWorker" in navigator)) {
     return null;
   }
-  const registration = await navigator.serviceWorker.ready;
+  // `.ready` waits forever when no worker is registered yet (dev, or a fresh session
+  // before activation) — `getRegistration()` resolves immediately either way.
+  const registration = await navigator.serviceWorker.getRegistration();
+  if (!registration) {
+    return null;
+  }
   return registration.pushManager.getSubscription();
 }
 
 export async function subscribe(vapidKey: string): Promise<PushSubscription> {
-  const registration = await navigator.serviceWorker.ready;
+  const registration = await navigator.serviceWorker.getRegistration();
+  if (!registration) {
+    throw new Error("Notifications need the app to finish loading. Reload and try again.");
+  }
   const existing = await registration.pushManager.getSubscription();
   if (existing) {
     return existing;

@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 import {
+  forgetThisDevice,
   removePushSubscription,
   savePushSubscription,
   syncTimezone,
@@ -15,7 +16,10 @@ const client = vi.hoisted(() => {
   return { eq, update, del, from, rpc };
 });
 
+const push = vi.hoisted(() => ({ currentSubscription: vi.fn() }));
+
 vi.mock("@/lib/supabase", () => ({ supabase: { from: client.from, rpc: client.rpc } }));
+vi.mock("@/lib/push", () => ({ currentSubscription: push.currentSubscription }));
 
 const USER_ID = "22222222-2222-2222-2222-222222222222";
 const SUB = { endpoint: "https://web.push.apple.com/abc", p256dh: "p", auth: "a" };
@@ -25,6 +29,10 @@ beforeEach(() => {
   client.eq.mockResolvedValue({ error: null });
   client.rpc.mockResolvedValue({ error: null });
 });
+
+function fakeSubscription(unsubscribe = vi.fn().mockResolvedValue(true)) {
+  return { endpoint: SUB.endpoint, unsubscribe };
+}
 
 describe("savePushSubscription", () => {
   test("hands the device and time zone to the RPC", async () => {
@@ -79,5 +87,36 @@ describe("syncTimezone", () => {
     await syncTimezone(USER_ID, "Europe/London");
     expect(client.update).toHaveBeenCalledWith({ timezone: "Europe/London" });
     expect(client.eq).toHaveBeenCalledWith("user_id", USER_ID);
+  });
+});
+
+describe("forgetThisDevice", () => {
+  test("no subscription on this device: resolves without touching the database", async () => {
+    push.currentSubscription.mockResolvedValue(null);
+    await expect(forgetThisDevice()).resolves.toBeUndefined();
+    expect(client.from).not.toHaveBeenCalled();
+  });
+
+  test("a subscription: deletes it by endpoint and unsubscribes", async () => {
+    const sub = fakeSubscription();
+    push.currentSubscription.mockResolvedValue(sub);
+    await forgetThisDevice();
+    expect(client.from).toHaveBeenCalledWith("push_subscriptions");
+    expect(client.eq).toHaveBeenCalledWith("endpoint", SUB.endpoint);
+    expect(sub.unsubscribe).toHaveBeenCalled();
+  });
+
+  test("the delete fails: still unsubscribes, and resolves rather than throwing", async () => {
+    client.eq.mockResolvedValue({ error: { message: "Sign in first." } });
+    const sub = fakeSubscription();
+    push.currentSubscription.mockResolvedValue(sub);
+    await expect(forgetThisDevice()).resolves.toBeUndefined();
+    expect(sub.unsubscribe).toHaveBeenCalled();
+  });
+
+  test("a rejecting currentSubscription (no service worker yet): resolves, never throws", async () => {
+    push.currentSubscription.mockRejectedValue(new Error("no service worker"));
+    await expect(forgetThisDevice()).resolves.toBeUndefined();
+    expect(client.from).not.toHaveBeenCalled();
   });
 });
