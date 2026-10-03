@@ -90,6 +90,22 @@ export function isPushServiceEndpoint(endpoint: string): boolean {
   return url.protocol === "https:" && PUSH_HOSTS.some((re) => re.test(url.hostname));
 }
 
+/**
+ * What to write to a batch of outbox rows when something threw instead of settling normally
+ * (loadContext blew up, or a delivery's own query failed before it could call `settle`). Keeps
+ * "retry vs. give up after an exception" exactly as pure and tested as the happy path.
+ */
+export function failurePatch(
+  error: unknown,
+  attempts: number,
+  at: string,
+): { last_error: string; cancelled_at?: string } {
+  const message = (error instanceof Error ? error.message : String(error)).slice(0, 500);
+  return attempts >= MAX_ATTEMPTS
+    ? { last_error: message, cancelled_at: at }
+    : { last_error: message };
+}
+
 export function settle(statuses: number[], attempts: number): Settlement {
   if (statuses.some((s) => s >= 200 && s < 300)) {
     return "sent";

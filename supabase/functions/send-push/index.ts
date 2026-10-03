@@ -7,6 +7,7 @@ import webpush from "npm:web-push@3.6.7";
 import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
 import {
   type Delivery,
+  failurePatch,
   isGone,
   isPushServiceEndpoint,
   localDay,
@@ -162,7 +163,23 @@ Deno.serve(async (req) => {
     return json({ claimed: 0, sent: 0, skipped: 0 });
   }
   const now = new Date();
-  const { deliveries, skips } = planDeliveries(rows, await loadContext(db, rows, now));
+  let ctx: PlanContext;
+  try {
+    ctx = await loadContext(db, rows, now);
+  } catch (err) {
+    // claim_due_notifications already bumped attempts and set claimed_at on every one of these
+    // rows, so a thrown error here must still settle them — otherwise they're re-claimed every
+    // 2 minutes forever, climbing past MAX_ATTEMPTS with no cancelled_at.
+    const at = now.toISOString();
+    for (const row of rows) {
+      await db
+        .from("notification_outbox")
+        .update(failurePatch(err, row.attempts, at))
+        .eq("id", row.id);
+    }
+    return json({ error: failurePatch(err, 0, at).last_error }, 500);
+  }
+  const { deliveries, skips } = planDeliveries(rows, ctx);
   for (const skip of skips) {
     await db
       .from("notification_outbox")
@@ -173,8 +190,18 @@ Deno.serve(async (req) => {
   let sent = 0;
   for (const d of deliveries) {
     const attempts = Math.max(...d.rowIds.map((id) => attemptsOf.get(id) ?? 1));
-    if (await deliver(db, d, attempts)) {
-      sent++;
+    try {
+      if (await deliver(db, d, attempts)) {
+        sent++;
+      }
+    } catch (err) {
+      // A delivery that threw before it could call settle() (e.g. the push_subscriptions
+      // select itself failed) must not strand its rows, and must not strand the rest of the
+      // batch either — record the failure and keep going.
+      await db
+        .from("notification_outbox")
+        .update(failurePatch(err, attempts, new Date().toISOString()))
+        .in("id", d.rowIds);
     }
   }
   return json({ claimed: rows.length, sent, skipped: skips.length });

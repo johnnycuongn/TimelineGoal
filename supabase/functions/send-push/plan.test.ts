@@ -1,8 +1,10 @@
 import { describe, expect, test } from "vitest";
 import {
+  failurePatch,
   isGone,
   isPushServiceEndpoint,
   localDay,
+  MAX_ATTEMPTS,
   type OutboxRow,
   type PlanContext,
   planDeliveries,
@@ -152,6 +154,42 @@ describe("isPushServiceEndpoint", () => {
     expect(isPushServiceEndpoint("https://evil.example/x")).toBe(false);
     expect(isPushServiceEndpoint("https://web.push.apple.com.evil.example/x")).toBe(false);
     expect(isPushServiceEndpoint("not a url")).toBe(false);
+  });
+});
+
+describe("failurePatch", () => {
+  const AT = "2026-10-03T09:00:00.000Z";
+
+  test("below the cap: records the error, does not cancel", () => {
+    expect(failurePatch(new Error("boom"), MAX_ATTEMPTS - 1, AT)).toEqual({
+      last_error: "boom",
+    });
+  });
+
+  test("at the cap: gives up, cancelled_at is set", () => {
+    expect(failurePatch(new Error("boom"), MAX_ATTEMPTS, AT)).toEqual({
+      last_error: "boom",
+      cancelled_at: AT,
+    });
+  });
+
+  test("past the cap: still gives up", () => {
+    expect(failurePatch(new Error("boom"), MAX_ATTEMPTS + 3, AT)).toEqual({
+      last_error: "boom",
+      cancelled_at: AT,
+    });
+  });
+
+  test("a non-Error throw still becomes a string", () => {
+    expect(failurePatch("just a string", 1, AT)).toEqual({ last_error: "just a string" });
+    expect(failurePatch({ code: 500 }, 1, AT)).toEqual({ last_error: "[object Object]" });
+    expect(failurePatch(null, 1, AT)).toEqual({ last_error: "null" });
+  });
+
+  test("a long message is clipped to 500 characters", () => {
+    const patch = failurePatch(new Error("x".repeat(600)), 1, AT);
+    expect(patch.last_error).toHaveLength(500);
+    expect(patch.last_error).toBe("x".repeat(500));
   });
 });
 
