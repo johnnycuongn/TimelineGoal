@@ -166,6 +166,17 @@ new migration that undoes the change.
   brand-new Vercel project's first deployment. On this project a bare `npx vercel` is a
   preview.
 
+## Notifications
+
+- `VITE_VAPID_PUBLIC_KEY` must be set in `.env.local` and in Vercel (Preview and Production). It is public.
+- Edge Function secrets (owner sets them; never in the repo): `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`, `DISPATCH_SECRET` — `npx supabase secrets set --project-ref uosxptayqdetgbyercqt …`.
+- Vault entries: `dispatch_secret` (same value as `DISPATCH_SECRET`) and `send_push_url`.
+- Redeploy the function after changing it: `npx supabase functions deploy send-push --no-verify-jwt --project-ref uosxptayqdetgbyercqt`.
+- Rotating `DISPATCH_SECRET`: set the new secret on the function and update the Vault entry in the same sitting; until both match, `net._http_response` shows 401s and nothing sends.
+- The send-push function only sends to known push-service hosts (Apple, Google FCM, Mozilla, Windows); a subscription pointing anywhere else is deleted unsent.
+- If the smoke test (`curl -X POST …/functions/v1/send-push` with no header) returns a 5xx instead of 401, a VAPID secret is missing or malformed — the function fails at boot.
+- `npm run check:functions` type-checks the Edge Function with Deno (needs `deno` installed).
+
 ## Free-tier limits
 
 See the "Free tiers" table in `README.md`. Short version: everything is free today.
