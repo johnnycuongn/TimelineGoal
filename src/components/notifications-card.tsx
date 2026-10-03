@@ -23,6 +23,7 @@ import {
 } from "@/lib/push";
 
 const VAPID_KEY = import.meta.env.VITE_VAPID_PUBLIC_KEY;
+const HH_MM = /^([01]\d|2[0-3]):[0-5]\d$/;
 
 interface Toggle {
   kind: NotificationKind;
@@ -79,6 +80,13 @@ function Toggles({
   const [remindAt, setRemindAt] = useState(prefs.remindAt);
   const onTime = useCallback((e: ChangeEvent<HTMLInputElement>) => setRemindAt(e.target.value), []);
   const onTimeDone = useCallback(() => {
+    // Clearing the field (or any other non-HH:MM value) isn't a real change — put the
+    // saved time back rather than sending a value the server will reject and getting
+    // stuck showing a blank input.
+    if (!HH_MM.test(remindAt)) {
+      setRemindAt(prefs.remindAt);
+      return;
+    }
     if (remindAt !== prefs.remindAt) {
       onRemindAt(remindAt);
     }
@@ -130,6 +138,7 @@ function Toggles({
             id="notify-remind-at"
             onBlur={onTimeDone}
             onChange={onTime}
+            required
             step={900}
             type="time"
             value={remindAt}
