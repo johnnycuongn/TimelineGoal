@@ -18,17 +18,40 @@ for (const table of tables) {
   );
   failed ||= !ok;
 }
+// Notification tables grant nothing to anon: refused outright, or at worst empty.
+const locked = ["push_subscriptions", "notification_prefs", "notification_outbox"];
+for (const table of locked) {
+  const res = await fetch(`${url}/rest/v1/${table}?select=*&limit=5`, { headers });
+  const body = await res.json();
+  const ok = !res.ok || (Array.isArray(body) && body.length === 0);
+  console.log(`${ok ? "ok  " : "FAIL"} ${table} refused signed-out: ${res.status}`);
+  failed ||= !ok;
+}
 const ping = await fetch(`${url}/rest/v1/keepalive?select=id`, { headers });
 const rows = await ping.json();
 const pingOk = ping.ok && Array.isArray(rows) && rows.length === 1;
 console.log(`${pingOk ? "ok  " : "FAIL"} keepalive: ${ping.status}`);
 failed ||= !pingOk;
-const rpc = await fetch(`${url}/rest/v1/rpc/mint_invite_code`, {
-  method: "POST",
-  headers: { ...headers, "Content-Type": "application/json" },
-  body: "{}",
-});
-const rpcOk = !rpc.ok;
-console.log(`${rpcOk ? "ok  " : "FAIL"} mint_invite_code refused signed-out: ${rpc.status}`);
-failed ||= !rpcOk;
+const rpcs = {
+  mint_invite_code: {},
+  save_push_subscription: {
+    p_endpoint: "https://push.example.invalid/probe",
+    p_p256dh: "x",
+    p_auth: "x",
+    p_user_agent: "probe",
+    p_timezone: "UTC",
+  },
+  claim_due_notifications: {},
+  enqueue_reminders: {},
+};
+for (const [name, args] of Object.entries(rpcs)) {
+  const rpc = await fetch(`${url}/rest/v1/rpc/${name}`, {
+    method: "POST",
+    headers: { ...headers, "Content-Type": "application/json" },
+    body: JSON.stringify(args),
+  });
+  const rpcOk = !rpc.ok;
+  console.log(`${rpcOk ? "ok  " : "FAIL"} ${name} refused signed-out: ${rpc.status}`);
+  failed ||= !rpcOk;
+}
 process.exit(failed ? 1 : 0);
