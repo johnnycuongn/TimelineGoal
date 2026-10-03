@@ -12,3 +12,4 @@ dev-dist
 *.pem
 .dev.vars
 .worktrees/
+deno.lock

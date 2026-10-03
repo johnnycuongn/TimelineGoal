@@ -1,6 +1,7 @@
 import { describe, expect, test } from "vitest";
 import {
   isGone,
+  isPushServiceEndpoint,
   localDay,
   type OutboxRow,
   type PlanContext,
@@ -132,6 +133,25 @@ describe("planDeliveries", () => {
     const { deliveries } = planDeliveries([r], ctx());
     expect(deliveries[0]?.message.body).toBe("Ari ❤️ your 🏃 Morning run paw");
     expect(deliveries[0]?.message.tag).toBe("heart-2026-10-03");
+  });
+});
+
+describe("isPushServiceEndpoint", () => {
+  test("accepts the known push services", () => {
+    expect(isPushServiceEndpoint("https://web.push.apple.com/QGuMCHanFake")).toBe(true);
+    expect(isPushServiceEndpoint("https://1-edge.push.apple.com/QGuMCHanFake")).toBe(true);
+    expect(isPushServiceEndpoint("https://fcm.googleapis.com/fcm/send/abc")).toBe(true);
+    expect(isPushServiceEndpoint("https://updates.push.services.mozilla.com/wpush/v2/abc")).toBe(
+      true,
+    );
+    expect(isPushServiceEndpoint("https://wns2-par02p.notify.windows.com/w/abc")).toBe(true);
+  });
+
+  test("rejects non-https, unparseable, and look-alike hosts", () => {
+    expect(isPushServiceEndpoint("http://web.push.apple.com/x")).toBe(false);
+    expect(isPushServiceEndpoint("https://evil.example/x")).toBe(false);
+    expect(isPushServiceEndpoint("https://web.push.apple.com.evil.example/x")).toBe(false);
+    expect(isPushServiceEndpoint("not a url")).toBe(false);
   });
 });
 

@@ -71,6 +71,25 @@ export function isGone(status: number): boolean {
   return status === 404 || status === 410;
 }
 
+const PUSH_HOSTS = [
+  /^web\.push\.apple\.com$/,
+  /\.push\.apple\.com$/,
+  /^fcm\.googleapis\.com$/,
+  /^updates\.push\.services\.mozilla\.com$/,
+  /\.notify\.windows\.com$/,
+];
+
+/** True only for an https endpoint on a known push service, so a forged subscription can't aim our POSTs elsewhere. */
+export function isPushServiceEndpoint(endpoint: string): boolean {
+  let url: URL;
+  try {
+    url = new URL(endpoint);
+  } catch {
+    return false;
+  }
+  return url.protocol === "https:" && PUSH_HOSTS.some((re) => re.test(url.hostname));
+}
+
 export function settle(statuses: number[], attempts: number): Settlement {
   if (statuses.some((s) => s >= 200 && s < 300)) {
     return "sent";
