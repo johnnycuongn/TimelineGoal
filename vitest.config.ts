@@ -4,6 +4,9 @@ import viteConfig from "./vite.config";
 export default mergeConfig(
   viteConfig,
   defineConfig({
-    test: { environment: "node", include: ["src/**/*.test.ts"] },
+    test: {
+      environment: "node",
+      include: ["src/**/*.test.ts", "supabase/functions/**/*.test.ts"],
+    },
   }),
 );

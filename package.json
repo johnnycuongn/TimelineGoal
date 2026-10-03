@@ -14,7 +14,8 @@
     "fix": "biome check --write .",
     "test": "vitest run",
     "pwa-assets": "pwa-assets-generator",
-    "rls-probe": "node scripts/rls-probe.mjs"
+    "rls-probe": "node scripts/rls-probe.mjs",
+    "check:functions": "deno check supabase/functions/send-push/index.ts"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.1.15",
