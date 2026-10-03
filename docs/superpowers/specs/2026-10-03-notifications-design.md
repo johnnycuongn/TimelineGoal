@@ -16,15 +16,17 @@ from the Us page; all are on by default.
 
 | Kind | Fires when | Recipient | Delay | Example copy |
 |---|---|---|---|---|
-| `paw_shared` | partner paws a shared goal (`owner_id` null) | partner | 30 s | "Mia pawed 🏃 Morning run" |
-| `paw_own` | partner paws a goal she owns | partner | 30 s | "Mia pawed her 📚 Read 20 pages" |
-| `milestone_done` | a paw brings a milestone's count in its period to exactly `target_units` | partner of the actor | 30 s | "You two finished 💰 Save $500!" / "Mia finished her 💰 Save $500!" |
+| `paw_shared` | partner paws a shared goal (`owner_id` null) | partner | 30 s | "Mia pawed 🏃 Morning run for you both" |
+| `paw_own` | partner paws a goal they own | partner | 30 s | "Mia pawed 📚 Read 20 pages" |
+| `milestone_done` | a paw brings a milestone's count in its period to exactly `target_units` | partner of the actor | 30 s | "You two finished 💰 Save $500! 🎉" / "Mia finished 💰 Save $500! 🎉" |
 | `heart` | `reactions` insert | owner of the paw (`checkins.user_id`), if not the actor | 0 | "Mia ❤️ your Morning run paw" |
 | `seal` | `goal_seals` insert | the goal's `created_by`, if not the actor | 0 | "Mia sealed 🌍 Japan trip" |
 | `goal_added` | `goals` insert | partner | 0 | "Mia added 🎸 Learn a song" |
-| `goal_archived` | `goals.archived_at` null → set | partner | 0 | "Mia archived Morning run" |
+| `goal_archived` | `goals.archived_at` null → set | partner | 0 | "Mia tucked away Morning run" |
 | `partner_joined` | `members` insert | the member already in the den | 0 | "Mia joined your den 🐶" |
 | `reminder` | daily, at the member's chosen local time, only if they have open goals | the member | — | "Today's paws are waiting — 2 left" |
+
+Copy never genders anyone ("her", "his"): the app is for any two people.
 
 Not notified: goal edits (title, charm, target), pup name and anniversary
 changes. They are frequent and low-value.
@@ -55,7 +57,12 @@ per-event Database Webhooks with the function sleeping out the undo window (no
 batching, no retries, reminder still needs cron), and a Vercel sender (spreads
 the elevated Supabase key to a second platform).
 
-## Database — `supabase/migrations/0011_notifications.sql`
+## Database
+
+Three migrations: `0011_notifications.sql` (types, tables, RLS,
+`save_push_subscription`), `0012_notification_triggers.sql` (the other functions and
+the triggers), `0013_notification_cron.sql` (dispatch and cron, applied after the
+Vault entries exist).
 
 ### Types and tables
 
@@ -75,12 +82,12 @@ the elevated Supabase key to a second platform).
 | `last_ok_at` | timestamptz null | last 201 from the push service |
 
 RLS: select and delete own rows. No insert/update grants; writes go through
-`save_push_subscription(p_endpoint, p_p256dh, p_auth, p_user_agent)`, a
+`save_push_subscription(p_endpoint, p_p256dh, p_auth, p_user_agent, p_timezone)`, a
 `security definer` RPC that upserts on `endpoint` and sets `user_id =
 auth.uid()`. Reassigning matters: when one partner signs out and the other signs
 in on the same phone, the device must stop receiving the first partner's
 notifications. The RPC also creates the caller's `notification_prefs` row if
-missing.
+missing, or updates its time zone (an unknown zone becomes `UTC`).
 
 **`notification_prefs`** — one row per member, private.
 
@@ -134,7 +141,8 @@ None of the three tables joins the `supabase_realtime` publication.
   not cancelled, and `claimed_at` is null or older than 2 minutes, using `for
   update skip locked`; returns the claimed rows. Executable only by
   `service_role`.
-- `enqueue_reminders()` — for each `notification_prefs` row whose user has at
+- `enqueue_reminders(p_now timestamptz default now())` — `p_now` lets the scenario
+  tests stand at any local time. For each `notification_prefs` row whose user has at
   least one subscription, `reminder` not in `muted`, and where local time
   `(now() at time zone timezone)` is within `[remind_at, remind_at + 2 h)` and
   `last_reminded_on` is before the local date: if `open_goals_for(user, local
@@ -165,7 +173,7 @@ The milestone count matches `checkins_validate`: both partners' paws count. The
 check-in that reaches the target triggers the celebration, so undoing it in time
 cancels the celebration too.
 
-### Cron — `supabase/migrations/0012_notification_cron.sql`
+### Cron — `supabase/migrations/0013_notification_cron.sql`
 
 A separate migration, applied after the Vault entries exist (see Order of work).
 
@@ -306,12 +314,12 @@ New primitive `src/components/ui/switch.tsx`: a hand-written wrapper over
 
 ## Order of work
 
-1. Migration (tables, functions, triggers) + SQL scenarios + RLS probe; regenerate
+1. Migrations `0011` and `0012` + SQL scenarios + RLS probe; regenerate
    `src/lib/database.types.ts`.
 2. Owner generates VAPID keys and sets secrets and Vault entries.
 3. `notification-copy` + `send-push`; deploy the function; settle the Web Push
    library.
-4. `0012_notification_cron.sql` (needs the Vault entries).
+4. `0013_notification_cron.sql` (needs the Vault entries).
 5. Service worker switch, data layer, Us-page card, switch primitive.
 6. Preview deploy and end-to-end test. Production and `v*` tags remain the
    owner's call.
