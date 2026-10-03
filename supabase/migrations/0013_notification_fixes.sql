@@ -1,4 +1,5 @@
--- Push notifications, review fixes: a late reminder still fires.
+-- Push notifications, review fixes: a late reminder still fires, and an undone
+-- tuck-away doesn't buzz.
 
 -- Run every 15 minutes. A member is reminded once per due day, in the two hours after
 -- the most recent remind_at at or before their local now, if they have a phone, haven't
@@ -40,3 +41,36 @@ begin
 end
 $$;
 revoke execute on function public.enqueue_reminders(timestamptz) from public, anon, authenticated;
+
+-- A tuck-away waits 30 s, like a paw, because the timeline offers "Bring it back".
+create or replace function public.notify_goal_archived()
+returns trigger
+language plpgsql security definer
+set search_path = ''
+as $$
+begin
+  perform public.enqueue_notification(
+    new.couple_id, auth.uid(), 'goal_archived', new.id, null, interval '30 seconds');
+  return null;
+end
+$$;
+revoke execute on function public.notify_goal_archived() from public, anon, authenticated;
+
+-- Bringing a goal back cancels the tuck-away news that hasn't gone out yet.
+create or replace function public.notify_goal_unarchived()
+returns trigger
+language plpgsql security definer
+set search_path = ''
+as $$
+begin
+  update public.notification_outbox
+     set cancelled_at = now()
+   where goal_id = new.id and kind = 'goal_archived'
+     and sent_at is null and cancelled_at is null;
+  return null;
+end
+$$;
+create trigger notify_goal_unarchived after update of archived_at on public.goals
+  for each row when (old.archived_at is not null and new.archived_at is null)
+  execute function public.notify_goal_unarchived();
+revoke execute on function public.notify_goal_unarchived() from public, anon, authenticated;

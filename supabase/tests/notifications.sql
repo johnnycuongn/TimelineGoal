@@ -130,8 +130,11 @@ end $$;
 set local role authenticated;
 select set_config('request.jwt.claims', '{"sub":"b0000000-0000-4000-8000-00000000000b","role":"authenticated"}', true);
 delete from public.checkins where id = 'd1000000-0000-4000-8000-000000000004';
--- Mia tucks tomorrow's packing away: Ari hears.
+-- Mia tucks tomorrow's packing away: Ari hears, after the same 30 s an undo gets.
 update public.goals set archived_at = now() where id = 'c1000000-0000-4000-8000-000000000005';
+-- Mia tucks the vet away, then taps "Bring it back": Ari never hears about it.
+update public.goals set archived_at = now() where id = 'c1000000-0000-4000-8000-000000000004';
+update public.goals set archived_at = null where id = 'c1000000-0000-4000-8000-000000000004';
 reset role;
 do $$ begin
   assert (select count(*) from public.notification_outbox
@@ -140,8 +143,17 @@ do $$ begin
     'undoing the finishing paw cancels the celebration too';
   assert (select count(*) from public.notification_outbox
           where kind = 'goal_archived' and recipient_id = 'a0000000-0000-4000-8000-00000000000a'
-            and actor_id = 'b0000000-0000-4000-8000-00000000000b') = 1,
-    'Ari hears that Mia tucked a goal away';
+            and actor_id = 'b0000000-0000-4000-8000-00000000000b'
+            and goal_id = 'c1000000-0000-4000-8000-000000000005' and cancelled_at is null
+            and send_after = now() + interval '30 seconds') = 1,
+    'Ari hears that Mia tucked a goal away, after 30 seconds';
+  assert (select count(*) from public.notification_outbox
+          where kind = 'goal_archived' and goal_id = 'c1000000-0000-4000-8000-000000000004'
+            and cancelled_at is not null) = 1
+     and (select count(*) from public.notification_outbox
+          where kind = 'goal_archived' and goal_id = 'c1000000-0000-4000-8000-000000000004'
+            and cancelled_at is null) = 0,
+    'bringing a goal back cancels its tuck-away news';
 end $$;
 
 -- Open goals today. Ari: run (open), book (pawed), vet (today, open) = 2.
@@ -155,7 +167,8 @@ do $$ begin
   assert public.open_goals_for('a0000000-0000-4000-8000-00000000000a', current_date + 1) = 2, 'Ari has 2 open tomorrow';
 end $$;
 
--- Claiming: every due row in this den once (paws wait 30 s, so they are not due yet).
+-- Claiming: every due row in this den once (paws and tuck-aways wait 30 s, so they are
+-- not due yet).
 create temporary table claimed on commit drop as
   select * from public.claim_due_notifications(1000) where couple_id = current_setting('test.couple')::uuid;
 do $$ begin
@@ -163,8 +176,9 @@ do $$ begin
     select count(*) from public.notification_outbox
     where couple_id = current_setting('test.couple')::uuid and cancelled_at is null and send_after <= now()),
     'every due row is claimed';
-  assert not exists (select 1 from claimed where kind in ('paw_shared', 'paw_own', 'milestone_done')),
-    'paws are not due inside their 30 seconds';
+  assert not exists (select 1 from claimed
+                     where kind in ('paw_shared', 'paw_own', 'milestone_done', 'goal_archived')),
+    'paws and tuck-aways are not due inside their 30 seconds';
   assert (select bool_and(attempts = 1 and claimed_at = now()) from claimed), 'claiming counts an attempt';
   assert (select count(*) from public.claim_due_notifications(1000)
           where couple_id = current_setting('test.couple')::uuid) = 0,

@@ -22,7 +22,7 @@ from the Us page; all are on by default.
 | `heart` | `reactions` insert | owner of the paw (`checkins.user_id`), if not the actor | 0 | "Mia ❤️ your Morning run paw" |
 | `seal` | `goal_seals` insert | the goal's `created_by`, if not the actor | 0 | "Mia sealed 🌍 Japan trip" |
 | `goal_added` | `goals` insert | partner | 0 | "Mia added 🎸 Learn a song" |
-| `goal_archived` | `goals.archived_at` null → set | partner | 0 | "Mia tucked away Morning run" |
+| `goal_archived` | `goals.archived_at` null → set | partner | 30 s | "Mia tucked away Morning run" |
 | `partner_joined` | `members` insert | the member already in the den | 0 | "Mia joined your den 🐶" |
 | `reminder` | daily, at the member's chosen local time, only if they have open goals | the member | — | "Today's paws are waiting — 2 left" |
 
@@ -168,7 +168,8 @@ anon, authenticated` except `save_push_subscription` (granted to
 | `reactions` | insert | `heart` to the paw's `user_id` if it differs from `new.user_id`; delay 0. |
 | `goal_seals` | insert | `seal` to the goal's `created_by` if it differs from `new.user_id`; delay 0. Skips `goals_autoseal`'s seal for the creator. |
 | `goals` | insert | `goal_added`, actor `new.created_by`; delay 0. |
-| `goals` | update of `archived_at` | when `old.archived_at is null and new.archived_at is not null`: `goal_archived`, actor `auth.uid()`; delay 0. |
+| `goals` | update of `archived_at` | when `old.archived_at is null and new.archived_at is not null`: `goal_archived`, actor `auth.uid()`; delay 30 s, so "Bring it back" can cancel it. |
+| `goals` | update of `archived_at` | when `old.archived_at is not null and new.archived_at is null`: cancel unsent `goal_archived` rows for that goal. |
 | `members` | insert | `partner_joined`, actor `new.user_id`; delay 0. |
 
 The milestone count matches `checkins_validate`: both partners' paws count. The
