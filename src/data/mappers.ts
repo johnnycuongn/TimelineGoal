@@ -5,6 +5,7 @@ import {
   type Goal,
   isPartnerColorKey,
   type Member,
+  type NotificationPrefs,
   SHARED_OWNER,
 } from "@/lib/domain";
 
@@ -55,6 +56,13 @@ export function goalFromRow(row: GoalRow, seals: SealRow[]): Goal {
     createdAt: row.created_at,
     archivedAt: row.archived_at,
   };
+}
+
+export type NotificationPrefsRow = Tables<"notification_prefs">;
+
+export function notificationPrefsFromRow(row: NotificationPrefsRow): NotificationPrefs {
+  // Postgres `time` comes back as HH:MM:SS; the time input wants HH:MM.
+  return { timezone: row.timezone, remindAt: row.remind_at.slice(0, 5), muted: row.muted };
 }
 
 export function checkinFromRow(row: CheckinRow, reactions: ReactionRow[]): CheckIn {

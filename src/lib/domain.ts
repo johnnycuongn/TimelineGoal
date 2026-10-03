@@ -152,3 +152,24 @@ export interface CoupleData {
 export function isSealed(goal: Goal, memberIds: string[]): boolean {
   return goal.owner === SHARED_OWNER && memberIds.every((m) => goal.seals[m]);
 }
+
+export const NOTIFICATION_KINDS = [
+  "paw_shared",
+  "paw_own",
+  "milestone_done",
+  "heart",
+  "seal",
+  "goal_added",
+  "goal_archived",
+  "partner_joined",
+  "reminder",
+] as const;
+
+export type NotificationKind = (typeof NOTIFICATION_KINDS)[number];
+
+/** The caller's own notification settings. `remindAt` is local `HH:MM`. */
+export interface NotificationPrefs {
+  timezone: string;
+  remindAt: string;
+  muted: NotificationKind[];
+}

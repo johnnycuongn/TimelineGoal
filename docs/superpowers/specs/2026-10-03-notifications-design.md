@@ -22,7 +22,7 @@ from the Us page; all are on by default.
 | `heart` | `reactions` insert | owner of the paw (`checkins.user_id`), if not the actor | 0 | "Mia ❤️ your Morning run paw" |
 | `seal` | `goal_seals` insert | the goal's `created_by`, if not the actor | 0 | "Mia sealed 🌍 Japan trip" |
 | `goal_added` | `goals` insert | partner | 0 | "Mia added 🎸 Learn a song" |
-| `goal_archived` | `goals.archived_at` null → set | partner | 0 | "Mia tucked away Morning run" |
+| `goal_archived` | `goals.archived_at` null → set | partner | 30 s | "Mia tucked away Morning run" |
 | `partner_joined` | `members` insert | the member already in the den | 0 | "Mia joined your den 🐶" |
 | `reminder` | daily, at the member's chosen local time, only if they have open goals | the member | — | "Today's paws are waiting — 2 left" |
 
@@ -59,9 +59,10 @@ the elevated Supabase key to a second platform).
 
 ## Database
 
-Three migrations: `0011_notifications.sql` (types, tables, RLS,
+Four migrations: `0011_notifications.sql` (types, tables, RLS,
 `save_push_subscription`), `0012_notification_triggers.sql` (the other functions and
-the triggers), `0013_notification_cron.sql` (dispatch and cron, applied after the
+the triggers), `0013_notification_fixes.sql` (review fixes to the reminder window and
+tuck-away undo), `0014_notification_cron.sql` (dispatch and cron, applied after the
 Vault entries exist).
 
 ### Types and tables
@@ -143,12 +144,13 @@ None of the three tables joins the `supabase_realtime` publication.
   `service_role`.
 - `enqueue_reminders(p_now timestamptz default now())` — `p_now` lets the scenario
   tests stand at any local time. For each `notification_prefs` row whose user has at
-  least one subscription, `reminder` not in `muted`, and where local time
-  `(now() at time zone timezone)` is within `[remind_at, remind_at + 2 h)` and
-  `last_reminded_on` is before the local date: if `open_goals_for(user, local
-  date) > 0`, insert a `reminder` row due now; set `last_reminded_on` to the
-  local date either way. The two-hour window stops a reminder firing at 1 am for
-  someone who subscribed late.
+  least one subscription, `reminder` not in `muted`: the due day is the local date
+  if local time `(now() at time zone timezone)` has reached today's `remind_at`,
+  else the day before. If local time is within `[due day + remind_at, + 2 h)` and
+  `last_reminded_on` is before the due day: if `open_goals_for(user, due day) > 0`,
+  insert a `reminder` row due now; set `last_reminded_on` to the due day either
+  way. The window may cross midnight (a 23:50 reminder fires on the 00:00 tick);
+  its two hours stop a reminder firing at 1 am for someone who subscribed late.
 - `dispatch_notifications()` — if any outbox row is due, `net.http_post` to the
   `send-push` URL with header `x-dispatch-secret`, both read from Vault
   (`send_push_url`, `dispatch_secret`). Otherwise does nothing.
@@ -166,14 +168,15 @@ anon, authenticated` except `save_push_subscription` (granted to
 | `reactions` | insert | `heart` to the paw's `user_id` if it differs from `new.user_id`; delay 0. |
 | `goal_seals` | insert | `seal` to the goal's `created_by` if it differs from `new.user_id`; delay 0. Skips `goals_autoseal`'s seal for the creator. |
 | `goals` | insert | `goal_added`, actor `new.created_by`; delay 0. |
-| `goals` | update of `archived_at` | when `old.archived_at is null and new.archived_at is not null`: `goal_archived`, actor `auth.uid()`; delay 0. |
+| `goals` | update of `archived_at` | when `old.archived_at is null and new.archived_at is not null`: `goal_archived`, actor `auth.uid()`; delay 30 s, so "Bring it back" can cancel it. |
+| `goals` | update of `archived_at` | when `old.archived_at is not null and new.archived_at is null`: cancel unsent `goal_archived` rows for that goal. |
 | `members` | insert | `partner_joined`, actor `new.user_id`; delay 0. |
 
 The milestone count matches `checkins_validate`: both partners' paws count. The
 check-in that reaches the target triggers the celebration, so undoing it in time
 cancels the celebration too.
 
-### Cron — `supabase/migrations/0013_notification_cron.sql`
+### Cron — `supabase/migrations/0014_notification_cron.sql`
 
 A separate migration, applied after the Vault entries exist (see Order of work).
 
@@ -319,7 +322,7 @@ New primitive `src/components/ui/switch.tsx`: a hand-written wrapper over
 2. Owner generates VAPID keys and sets secrets and Vault entries.
 3. `notification-copy` + `send-push`; deploy the function; settle the Web Push
    library.
-4. `0013_notification_cron.sql` (needs the Vault entries).
+4. `0014_notification_cron.sql` (needs the Vault entries; `0013` is the review fixes).
 5. Service worker switch, data layer, Us-page card, switch primitive.
 6. Preview deploy and end-to-end test. Production and `v*` tags remain the
    owner's call.

@@ -226,6 +226,129 @@ export type Database = {
           },
         ]
       }
+      notification_outbox: {
+        Row: {
+          actor_id: string | null
+          attempts: number
+          cancelled_at: string | null
+          checkin_id: string | null
+          claimed_at: string | null
+          couple_id: string
+          created_at: string
+          goal_id: string | null
+          id: string
+          kind: Database["public"]["Enums"]["notification_kind"]
+          last_error: string | null
+          recipient_id: string
+          send_after: string
+          sent_at: string | null
+        }
+        Insert: {
+          actor_id?: string | null
+          attempts?: number
+          cancelled_at?: string | null
+          checkin_id?: string | null
+          claimed_at?: string | null
+          couple_id: string
+          created_at?: string
+          goal_id?: string | null
+          id?: string
+          kind: Database["public"]["Enums"]["notification_kind"]
+          last_error?: string | null
+          recipient_id: string
+          send_after?: string
+          sent_at?: string | null
+        }
+        Update: {
+          actor_id?: string | null
+          attempts?: number
+          cancelled_at?: string | null
+          checkin_id?: string | null
+          claimed_at?: string | null
+          couple_id?: string
+          created_at?: string
+          goal_id?: string | null
+          id?: string
+          kind?: Database["public"]["Enums"]["notification_kind"]
+          last_error?: string | null
+          recipient_id?: string
+          send_after?: string
+          sent_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notification_outbox_couple_id_fkey"
+            columns: ["couple_id"]
+            isOneToOne: false
+            referencedRelation: "couples"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notification_outbox_goal_id_fkey"
+            columns: ["goal_id"]
+            isOneToOne: false
+            referencedRelation: "goals"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      notification_prefs: {
+        Row: {
+          last_reminded_on: string | null
+          muted: Database["public"]["Enums"]["notification_kind"][]
+          remind_at: string
+          timezone: string
+          user_id: string
+        }
+        Insert: {
+          last_reminded_on?: string | null
+          muted?: Database["public"]["Enums"]["notification_kind"][]
+          remind_at?: string
+          timezone?: string
+          user_id: string
+        }
+        Update: {
+          last_reminded_on?: string | null
+          muted?: Database["public"]["Enums"]["notification_kind"][]
+          remind_at?: string
+          timezone?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      push_subscriptions: {
+        Row: {
+          auth: string
+          created_at: string
+          endpoint: string
+          id: string
+          last_ok_at: string | null
+          p256dh: string
+          user_agent: string | null
+          user_id: string
+        }
+        Insert: {
+          auth: string
+          created_at?: string
+          endpoint: string
+          id?: string
+          last_ok_at?: string | null
+          p256dh: string
+          user_agent?: string | null
+          user_id: string
+        }
+        Update: {
+          auth?: string
+          created_at?: string
+          endpoint?: string
+          id?: string
+          last_ok_at?: string | null
+          p256dh?: string
+          user_agent?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       reactions: {
         Row: {
           checkin_id: string
@@ -270,6 +393,31 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      claim_due_notifications: {
+        Args: { p_limit?: number }
+        Returns: {
+          actor_id: string | null
+          attempts: number
+          cancelled_at: string | null
+          checkin_id: string | null
+          claimed_at: string | null
+          couple_id: string
+          created_at: string
+          goal_id: string | null
+          id: string
+          kind: Database["public"]["Enums"]["notification_kind"]
+          last_error: string | null
+          recipient_id: string
+          send_after: string
+          sent_at: string | null
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "notification_outbox"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       create_den: {
         Args: { p_color: string; p_display_name: string }
         Returns: {
@@ -277,6 +425,18 @@ export type Database = {
           invite_code: string
         }[]
       }
+      enqueue_notification: {
+        Args: {
+          p_actor: string
+          p_checkin: string
+          p_couple: string
+          p_delay: string
+          p_goal: string
+          p_kind: Database["public"]["Enums"]["notification_kind"]
+        }
+        Returns: undefined
+      }
+      enqueue_reminders: { Args: { p_now?: string }; Returns: number }
       fresh_share_code: { Args: never; Returns: string }
       gen_share_code: { Args: never; Returns: string }
       is_day_key: { Args: { p: string }; Returns: boolean }
@@ -287,15 +447,40 @@ export type Database = {
       }
       mint_invite_code: { Args: never; Returns: string }
       my_couple_id: { Args: never; Returns: string }
+      open_goals_for: {
+        Args: { p_day: string; p_user: string }
+        Returns: number
+      }
       period_horizon: {
         Args: { p: string }
         Returns: Database["public"]["Enums"]["horizon"]
       }
       period_range: { Args: { p: string }; Returns: unknown }
+      prune_notifications: { Args: never; Returns: undefined }
+      save_push_subscription: {
+        Args: {
+          p_auth: string
+          p_endpoint: string
+          p_p256dh: string
+          p_timezone: string
+          p_user_agent: string
+        }
+        Returns: undefined
+      }
       week_start: { Args: { p: string }; Returns: string }
     }
     Enums: {
       horizon: "day" | "week" | "month" | "quarter" | "year"
+      notification_kind:
+        | "paw_shared"
+        | "paw_own"
+        | "milestone_done"
+        | "heart"
+        | "seal"
+        | "goal_added"
+        | "goal_archived"
+        | "partner_joined"
+        | "reminder"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -424,6 +609,17 @@ export const Constants = {
   public: {
     Enums: {
       horizon: ["day", "week", "month", "quarter", "year"],
+      notification_kind: [
+        "paw_shared",
+        "paw_own",
+        "milestone_done",
+        "heart",
+        "seal",
+        "goal_added",
+        "goal_archived",
+        "partner_joined",
+        "reminder",
+      ],
     },
   },
 } as const

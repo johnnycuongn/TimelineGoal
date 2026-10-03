@@ -27,6 +27,7 @@ Two accounts are needed to try pairing: sign up twice (any email; confirmations 
 ## Supabase
 
 - Project `couplegoal` (ref `uosxptayqdetgbyercqt`), region `ap-southeast-2`. Migrations `0001`–`0007` are applied to it; `0006` is the security-advisor hardening, `0007` the post-review fixes. Auth: email + password with **Confirm email off** (Authentication → Sign In / Providers → Email). Magic links would open in Safari rather than the installed app, so there are none.
+- Notifications: migrations `0011`–`0014` add `push_subscriptions`, `notification_prefs`, a private `notification_outbox`, the triggers that fill it, and three `pg_cron` jobs. The `send-push` Edge Function (`supabase/functions/send-push/`, deployed with `--no-verify-jwt`) sends Web Push. Scenario tests: run `supabase/tests/notifications.sql` through the Supabase MCP `execute_sql` (it rolls back).
 - Schema changes: add a numbered file to `supabase/migrations/`, apply it (Supabase MCP `apply_migration`, or `npx supabase link` + `npx supabase db push`), regenerate `src/lib/database.types.ts`, run the RLS probe.
 - The publishable key ships in the browser on purpose; RLS is what protects rows. Never put a `sb_secret_` / `service_role` key in this repo, in `.env.local`, or on Vercel: nothing here needs one.
 

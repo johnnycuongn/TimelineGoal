@@ -2,6 +2,7 @@ import { Copy } from "lucide-react";
 import { type ChangeEvent, type FormEvent, useCallback, useState } from "react";
 import { toast } from "sonner";
 import ColorPicker from "@/components/color-picker";
+import NotificationsCard from "@/components/notifications-card";
 import PartnerDot from "@/components/partner-dot";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -210,6 +211,8 @@ export default function UsPage() {
           <ColorPicker onChange={onColor} taken={taken} value={self.color} />
         </CardContent>
       </Card>
+
+      <NotificationsCard />
 
       {me.members.length < MAX_MEMBERS ? (
         <Card>

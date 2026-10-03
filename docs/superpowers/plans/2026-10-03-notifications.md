@@ -1816,10 +1816,10 @@ git commit -m "Send the queued notes out as Web Push"
 
 ---
 
-### Task 6: Cron and dispatch (migration 0013)
+### Task 6: Cron and dispatch (migration 0014)
 
 **Files:**
-- Create: `supabase/migrations/0013_notification_cron.sql`
+- Create: `supabase/migrations/0014_notification_cron.sql`
 
 **Interfaces:**
 - Consumes: Vault secrets `dispatch_secret` (owner, Task 5) and `send_push_url` (this task); functions from Task 4; the deployed function (Task 5).
@@ -1838,7 +1838,7 @@ Expected: two rows, `dispatch_secret` and `send_push_url`. If `dispatch_secret` 
 
 - [ ] **Step 2: Write the migration**
 
-`supabase/migrations/0013_notification_cron.sql`:
+`supabase/migrations/0014_notification_cron.sql`:
 
 ```sql
 -- Push notifications, part 3: the clocks. Needs the Vault entries send_push_url and
@@ -1886,7 +1886,7 @@ select cron.schedule('prune-notifications', '0 4 * * *', 'select public.prune_no
 
 - [ ] **Step 3: Apply**
 
-Supabase MCP `apply_migration`: name `0013_notification_cron`, query = file contents.
+Supabase MCP `apply_migration`: name `0014_notification_cron`, query = file contents.
 Then `execute_sql`: `select jobname, schedule, active from cron.job where jobname like '%notification%' or jobname = 'enqueue-reminders' order by jobname;`
 Expected: three active jobs with the schedules above.
 
@@ -1919,7 +1919,7 @@ Then clean up: `delete from public.notification_outbox where id = '<id>';`
 
 ```bash
 npm run fix && npm run check && npm test
-git add supabase/migrations/0013_notification_cron.sql
+git add supabase/migrations/0014_notification_cron.sql
 git commit -m "Check the queue every half minute and the clock every quarter hour"
 ```
 
@@ -3110,7 +3110,7 @@ git commit -m "Give the Us page a Notifications card"
 `README.md` — in the Supabase section, after the migrations line, add:
 
 ```markdown
-- Notifications: migrations `0011`–`0013` add `push_subscriptions`, `notification_prefs`, a private `notification_outbox`, the triggers that fill it, and three `pg_cron` jobs. The `send-push` Edge Function (`supabase/functions/send-push/`, deployed with `--no-verify-jwt`) sends Web Push. Scenario tests: run `supabase/tests/notifications.sql` through the Supabase MCP `execute_sql` (it rolls back).
+- Notifications: migrations `0011`–`0014` add `push_subscriptions`, `notification_prefs`, a private `notification_outbox`, the triggers that fill it, and three `pg_cron` jobs. The `send-push` Edge Function (`supabase/functions/send-push/`, deployed with `--no-verify-jwt`) sends Web Push. Scenario tests: run `supabase/tests/notifications.sql` through the Supabase MCP `execute_sql` (it rolls back).
 ```
 
 `DEPLOY.md` — add a section:
