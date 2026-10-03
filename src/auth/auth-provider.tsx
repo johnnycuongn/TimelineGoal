@@ -3,6 +3,10 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 import { forgetThisDevice } from "@/data/notification-mutations";
 import { friendlyError } from "@/lib/errors";
 import { supabase } from "@/lib/supabase";
+import { withTimeout } from "@/lib/timeout";
+
+// A slow network or a stuck service worker must not hold the sign-out button hostage.
+const FORGET_DEVICE_LIMIT_MS = 3000;
 
 type Status = "loading" | "signed-out" | "signed-in";
 
@@ -53,8 +57,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const signOut = useCallback(async () => {
-    // Before the session ends, while RLS still lets us delete our own row.
-    await forgetThisDevice();
+    // Before the session ends, while RLS still lets us delete our own row — but never
+    // for long: signing out always happens.
+    await withTimeout(forgetThisDevice(), FORGET_DEVICE_LIMIT_MS).catch(() => undefined);
     await supabase.auth.signOut();
   }, []);
 
