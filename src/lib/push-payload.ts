@@ -14,7 +14,7 @@ const HOME = "/den";
 
 /** Only ever a path inside the app: one leading slash, never `//host`. */
 export function safePath(url: unknown): string {
-  return typeof url === "string" && /^\/(?!\/)/.test(url) ? url : HOME;
+  return typeof url === "string" && /^\/(?![/\\])/.test(url) ? url : HOME;
 }
 
 function text(value: unknown): string | undefined {

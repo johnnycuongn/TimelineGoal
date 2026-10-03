@@ -9,6 +9,7 @@ describe("safePath", () => {
   test.each([
     "https://evil.example/phish",
     "//evil.example/phish",
+    "/\\evil.example/phish",
     "javascript:alert(1)",
     "goals",
     "",
