@@ -1,5 +1,5 @@
 import type { PostgrestError } from "@supabase/supabase-js";
-import type { Couple, CoupleData, Member } from "@/lib/domain";
+import type { Couple, CoupleData, Member, NotificationPrefs } from "@/lib/domain";
 import { supabase } from "@/lib/supabase";
 import {
   type CheckinRow,
@@ -8,6 +8,7 @@ import {
   type GoalRow,
   goalFromRow,
   memberFromRow,
+  notificationPrefsFromRow,
   type ReactionRow,
   type SealRow,
 } from "./mappers";
@@ -143,4 +144,17 @@ export async function fetchCoupleData(coupleId: string, fromDay: string): Promis
     goals: goals.map((g) => goalFromRow(g, seals)),
     checkins: checkins.map((c) => checkinFromRow(c, reactions)),
   };
+}
+
+/** My own notification settings; null until this account first turns notifications on. */
+export async function fetchNotificationPrefs(userId: string): Promise<NotificationPrefs | null> {
+  const { data, error } = await supabase
+    .from("notification_prefs")
+    .select("*")
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (error) {
+    throw error;
+  }
+  return data ? notificationPrefsFromRow(data) : null;
 }

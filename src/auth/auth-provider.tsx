@@ -1,5 +1,6 @@
 import type { Session } from "@supabase/supabase-js";
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { forgetThisDevice } from "@/data/notification-mutations";
 import { friendlyError } from "@/lib/errors";
 import { supabase } from "@/lib/supabase";
 
@@ -52,6 +53,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const signOut = useCallback(async () => {
+    // Before the session ends, while RLS still lets us delete our own row.
+    await forgetThisDevice();
     await supabase.auth.signOut();
   }, []);
 
