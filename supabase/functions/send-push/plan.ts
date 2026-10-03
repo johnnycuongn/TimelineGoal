@@ -19,6 +19,8 @@ export interface OutboxRow {
   kind: NotificationKind;
   goal_id: string | null;
   attempts: number;
+  /** When the row became due (ISO). A row older than its kind's TTL is dropped, not sent late. */
+  send_after: string;
 }
 
 export interface PlanContext {
@@ -38,7 +40,7 @@ export interface Delivery {
 
 export interface Skip {
   id: string;
-  reason: "muted" | "nothing open" | "missing goal";
+  reason: "expired" | "muted" | "nothing open" | "missing goal";
 }
 
 export type Settlement = "sent" | "no-devices" | "retry" | "give-up";
@@ -57,6 +59,15 @@ function isGoalKind(kind: NotificationKind): kind is GoalKind {
     kind === "goal_added" ||
     kind === "goal_archived"
   );
+}
+
+function ttlFor(kind: NotificationKind): number {
+  return kind === "reminder" ? REMINDER_TTL_SECONDS : TTL_SECONDS;
+}
+
+/** Past its TTL: after a sender outage, old news is dropped rather than sent in a burst. */
+function isExpired(r: OutboxRow, now: Date): boolean {
+  return (now.getTime() - Date.parse(r.send_after)) / 1000 > ttlFor(r.kind);
 }
 
 export function localDay(timezone: string, now: Date): string {
@@ -133,6 +144,10 @@ export function planDeliveries(
     localDay(ctx.prefs.get(recipient)?.timezone ?? "UTC", ctx.now);
 
   for (const r of rows) {
+    if (isExpired(r, ctx.now)) {
+      skips.push({ id: r.id, reason: "expired" });
+      continue;
+    }
     if (ctx.prefs.get(r.recipient_id)?.muted.includes(r.kind)) {
       skips.push({ id: r.id, reason: "muted" });
       continue;
@@ -170,7 +185,7 @@ export function planDeliveries(
       recipientId: r.recipient_id,
       rowIds: [r.id],
       message: notificationCopy(input, day),
-      ttlSeconds: r.kind === "reminder" ? REMINDER_TTL_SECONDS : TTL_SECONDS,
+      ttlSeconds: ttlFor(r.kind),
     });
   }
 

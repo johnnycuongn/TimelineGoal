@@ -25,9 +25,13 @@ function row(over: Partial<OutboxRow>): OutboxRow {
     kind: "paw_shared",
     goal_id: RUN,
     attempts: 1,
+    send_after: NOW.toISOString(),
     ...over,
   };
 }
+
+const HOUR = 3_600_000;
+const hoursAgo = (h: number) => new Date(NOW.getTime() - h * HOUR).toISOString();
 
 function ctx(over: Partial<PlanContext> = {}): PlanContext {
   return {
@@ -76,6 +80,36 @@ describe("planDeliveries", () => {
     const { deliveries } = planDeliveries([a, b], ctx());
     expect(deliveries[0]?.message.body).toBe("Mia pawed 🏃 Morning run for you both");
     expect(deliveries[0]?.rowIds).toHaveLength(2);
+  });
+
+  test("a paw older than its 12-hour TTL is dropped, not sent late", () => {
+    const stale = row({ kind: "paw_shared", goal_id: RUN, send_after: hoursAgo(13) });
+    const { deliveries, skips } = planDeliveries([stale], ctx());
+    expect(skips).toEqual([{ id: stale.id, reason: "expired" }]);
+    expect(deliveries).toEqual([]);
+  });
+
+  test("a reminder older than its 2-hour TTL is dropped", () => {
+    const stale = row({ kind: "reminder", actor_id: null, goal_id: null, send_after: hoursAgo(3) });
+    const { deliveries, skips } = planDeliveries([stale], ctx({ openGoals: new Map([[ARI, 2]]) }));
+    expect(skips).toEqual([{ id: stale.id, reason: "expired" }]);
+    expect(deliveries).toEqual([]);
+  });
+
+  test("a paw still inside its TTL is delivered", () => {
+    const late = row({ kind: "paw_shared", goal_id: RUN, send_after: hoursAgo(11) });
+    const { deliveries, skips } = planDeliveries([late], ctx());
+    expect(skips).toEqual([]);
+    expect(deliveries[0]?.rowIds).toEqual([late.id]);
+  });
+
+  test("an expired row is expired even when muted, and doesn't join a fresh paw batch", () => {
+    const stale = row({ kind: "paw_own", goal_id: READ, send_after: hoursAgo(13) });
+    const fresh = row({ kind: "paw_shared", goal_id: RUN });
+    const prefs = new Map([[ARI, { timezone: "UTC", muted: ["paw_own" as const] }]]);
+    const { deliveries, skips } = planDeliveries([stale, fresh], ctx({ prefs }));
+    expect(skips).toEqual([{ id: stale.id, reason: "expired" }]);
+    expect(deliveries[0]?.rowIds).toEqual([fresh.id]);
   });
 
   test("a muted kind is skipped, an unmuted one in the same batch still goes", () => {
