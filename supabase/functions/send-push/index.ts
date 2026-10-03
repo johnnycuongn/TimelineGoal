@@ -4,7 +4,7 @@
 // biome-ignore-all assist/source/organizeImports: the @deno-types pragma must stay directly above the webpush import it types
 // @deno-types="npm:@types/web-push@3.6.4"
 import webpush from "npm:web-push@3.6.7";
-import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
+import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2.116.0";
 import {
   type Delivery,
   failurePatch,
