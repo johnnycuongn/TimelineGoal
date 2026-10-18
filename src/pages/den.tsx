@@ -42,6 +42,9 @@ function WaitingForPartner({ code }: { code: string }) {
       <Button onClick={copy} size="sm" type="button" variant="outline">
         <Copy /> Copy
       </Button>
+      <Button asChild size="sm" variant="ghost">
+        <Link to="/pair?join=1">Join theirs instead</Link>
+      </Button>
     </section>
   );
 }

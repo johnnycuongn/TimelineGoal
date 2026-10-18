@@ -1,6 +1,6 @@
 import { Copy, Heart } from "lucide-react";
 import { type ChangeEvent, type FormEvent, useCallback, useEffect, useState } from "react";
-import { Navigate, useNavigate } from "react-router";
+import { Navigate, useNavigate, useSearchParams } from "react-router";
 import { useAuth } from "@/auth/auth-provider";
 import ColorPicker from "@/components/color-picker";
 import { ErrorPanel } from "@/components/error-panel";
@@ -22,13 +22,17 @@ import {
 import { friendlyError } from "@/lib/errors";
 import { isValidShareCode, normalizeShareCode } from "@/lib/share-code";
 
-type Step = "choose" | "waiting" | "name";
+type Step = "choose" | "waiting" | "join" | "name";
 
-function initialStepFor(me: Me): Step {
+/** `wantsJoin` (from `/pair?join=1`) opens a den of one straight on the join form. */
+function initialStepFor(me: Me, wantsJoin: boolean): Step {
   if (!me.couple) {
     return "choose";
   }
-  return me.members.length === MAX_MEMBERS ? "name" : "waiting";
+  if (me.members.length === MAX_MEMBERS) {
+    return "name";
+  }
+  return wantsJoin ? "join" : "waiting";
 }
 
 export default function PairPage() {
@@ -57,6 +61,7 @@ function PairFlow({
   refresh: () => Promise<Me | undefined>;
 }) {
   const navigate = useNavigate();
+  const [params] = useSearchParams();
   const self = me.members.find((m) => m.id === me.userId);
   const defaultName = self?.displayName ?? email?.split("@")[0] ?? "";
   const [displayName, setDisplayName] = useState(defaultName);
@@ -64,14 +69,14 @@ function PairFlow({
   const [code, setCode] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [step, setStep] = useState<Step>(() => initialStepFor(me));
+  const [step, setStep] = useState<Step>(() => initialStepFor(me, params.has("join")));
   const [inviteCode, setInviteCode] = useState(me.couple?.inviteCode ?? "");
   const [pupName, setPupName] = useState("");
 
-  // The partner joining flips this page from "waiting" to "name" (Realtime is wired in Task 6;
-  // until then SWR's focus revalidation catches it).
+  // The partner joining flips this page from "waiting" (or "join", if they beat us to it)
+  // to "name" (Realtime is wired in Task 6; until then SWR's focus revalidation catches it).
   useEffect(() => {
-    if (step === "waiting" && me.members.length === MAX_MEMBERS) {
+    if ((step === "waiting" || step === "join") && me.members.length === MAX_MEMBERS) {
       setStep("name");
     }
   }, [step, me.members.length]);
@@ -144,6 +149,74 @@ function PairFlow({
     void copyWithToast(inviteCode, "Code copied");
   }, [inviteCode]);
   const goToDen = useCallback(() => navigate("/den"), [navigate]);
+  const showJoin = useCallback(() => {
+    setError(null);
+    setStep("join");
+  }, []);
+  const showWaiting = useCallback(() => {
+    setError(null);
+    setStep("waiting");
+  }, []);
+
+  const errorLine = error ? (
+    <p className="mt-4 text-destructive text-sm" role="alert">
+      {error}
+    </p>
+  ) : null;
+
+  const joinCard = (
+    <Card>
+      <CardHeader>
+        <h2 className="display-title text-2xl">Join with a code</h2>
+        <p className="text-muted-foreground text-sm">
+          Got a 6-character code from your partner? If you pick the same colour as them, you'll get
+          another.
+        </p>
+        {me.couple ? (
+          <p className="text-muted-foreground text-sm">
+            You'll move into their den, and your own den closes, along with anything you've added to
+            it.
+          </p>
+        ) : null}
+      </CardHeader>
+      <CardContent>
+        <form className="space-y-4" onSubmit={onJoin}>
+          <div className="space-y-2">
+            <Label htmlFor="name-join">Your name</Label>
+            <Input
+              autoComplete="given-name"
+              id="name-join"
+              maxLength={DISPLAY_NAME_MAX}
+              onChange={onDisplayName}
+              required
+              value={displayName}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="code">Share code</Label>
+            <Input
+              autoCapitalize="characters"
+              autoComplete="off"
+              className="font-heading text-xl uppercase tracking-[0.3em]"
+              id="code"
+              maxLength={7}
+              onChange={onCode}
+              placeholder="ABC234"
+              required
+              value={code}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>Your colour</Label>
+            <ColorPicker onChange={setColor} value={color} />
+          </div>
+          <Button className="w-full sm:w-auto" disabled={busy} type="submit" variant="secondary">
+            Join den
+          </Button>
+        </form>
+      </CardContent>
+    </Card>
+  );
 
   if (step === "name") {
     return (
@@ -209,8 +282,30 @@ function PairFlow({
             <Button onClick={goToDen} type="button" variant="ghost">
               Go to the Den
             </Button>
+            <div className="border-border border-t pt-4">
+              <p className="mb-2 text-muted-foreground text-sm">
+                Your partner made a den too? Join theirs instead.
+              </p>
+              <Button onClick={showJoin} type="button" variant="outline">
+                Enter their code
+              </Button>
+            </div>
           </CardContent>
         </Card>
+      </section>
+    );
+  }
+
+  if (step === "join") {
+    return (
+      <section className="page-wrap flex min-h-[60dvh] items-center justify-center py-10">
+        <div className="w-full max-w-md">
+          {joinCard}
+          {errorLine}
+          <Button className="mt-4" onClick={showWaiting} type="button" variant="ghost">
+            Back to my code
+          </Button>
+        </div>
       </section>
     );
   }
@@ -253,62 +348,9 @@ function PairFlow({
             </form>
           </CardContent>
         </Card>
-        <Card>
-          <CardHeader>
-            <h2 className="display-title text-2xl">Join with a code</h2>
-            <p className="text-muted-foreground text-sm">
-              Got a 6-character code from your partner? If you pick the same colour as them, you'll
-              get another.
-            </p>
-          </CardHeader>
-          <CardContent>
-            <form className="space-y-4" onSubmit={onJoin}>
-              <div className="space-y-2">
-                <Label htmlFor="name-join">Your name</Label>
-                <Input
-                  autoComplete="given-name"
-                  id="name-join"
-                  maxLength={DISPLAY_NAME_MAX}
-                  onChange={onDisplayName}
-                  required
-                  value={displayName}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="code">Share code</Label>
-                <Input
-                  autoCapitalize="characters"
-                  autoComplete="off"
-                  className="font-heading text-xl uppercase tracking-[0.3em]"
-                  id="code"
-                  maxLength={7}
-                  onChange={onCode}
-                  placeholder="ABC234"
-                  required
-                  value={code}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Your colour</Label>
-                <ColorPicker onChange={setColor} value={color} />
-              </div>
-              <Button
-                className="w-full sm:w-auto"
-                disabled={busy}
-                type="submit"
-                variant="secondary"
-              >
-                Join den
-              </Button>
-            </form>
-          </CardContent>
-        </Card>
+        {joinCard}
       </div>
-      {error ? (
-        <p className="mt-4 text-destructive text-sm" role="alert">
-          {error}
-        </p>
-      ) : null}
+      {errorLine}
     </section>
   );
 }

@@ -1,5 +1,6 @@
 import { Copy } from "lucide-react";
 import { type ChangeEvent, type FormEvent, useCallback, useState } from "react";
+import { Link } from "react-router";
 import { toast } from "sonner";
 import ColorPicker from "@/components/color-picker";
 import NotificationsCard from "@/components/notifications-card";
@@ -231,6 +232,9 @@ export default function UsPage() {
             </Button>
             <Button disabled={busy} onClick={mintCode} type="button" variant="ghost">
               Mint a new code
+            </Button>
+            <Button asChild variant="ghost">
+              <Link to="/pair?join=1">Join their code instead</Link>
             </Button>
           </CardContent>
         </Card>
